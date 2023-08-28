@@ -260,6 +260,8 @@ TESTS += charged-current_reaction
 TESTS += nc_cc_reaction
 TESTS += prepared_network
 TESTS += rate_variation
+TESTS += flow
+TESTS += cum_flow
 
 # Physical reference cases
 TESTS += bigbang
@@ -360,7 +362,8 @@ beta_decay_rate_module.o         :\
 hdf5_module.o                    :\
    global_class.o \
    error_msg_class.o \
-   parameter_class.o
+   parameter_class.o \
+   flow_module.o
 
 tw_rate_module.o                 :\
    parameter_class.o \

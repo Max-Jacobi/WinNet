@@ -81,6 +81,57 @@ def compare_default (stest, strial, tol,l_limit, flog):
 
 
 
+def compare_flows (stest, strial, tol, l_limit, flog):
+   """
+    compare two flow files (rows: nin zin yin nout zout yout flow)
+    - rows are matched by isotope pair, so row order may differ
+    - the direction of each flow is canonicalized by its sign, so
+      tiny flows whose direction flips due to roundoff cannot fail
+    - pairs whose flow is below l_limit*max(|flow|) of the trial file
+      in both files are ignored
+    - 4-column numeric lines (the time/temp/dens/dt header) are
+      compared with the same relative tolerance
+   """
+   def parse(lines):
+      flows = {}
+      header = []
+      for s in lines:
+         f = s.split()
+         try:
+            if len(f) == 4:
+               header += [float(x) for x in f]
+            elif len(f) == 7:
+               nin, zin, nout, zout = int(f[0]), int(f[1]), int(f[3]), int(f[4])
+               fl = float(f[6])
+               if (nout, zout) < (nin, zin): # canonical direction
+                  nin, zin, nout, zout, fl = nout, zout, nin, zin, -fl
+               flows[(nin, zin, nout, zout)] = fl
+         except ValueError:
+            continue # text header lines
+      return flows, header
+
+   ref, ref_header = parse(strial)
+   test, test_header = parse(stest)
+   errcode = 0
+
+   for f1, f2 in zip(ref_header, test_header):
+      if abs(f2-f1)/(abs(f1)+1e-20) > tol:
+         errcode += 1
+
+   limit = l_limit * max(abs(f) for f in ref.values())
+   for pair in set(ref) | set(test):
+      f1 = ref.get(pair, 0.0)
+      f2 = test.get(pair, 0.0)
+      if (abs(f1) <= limit) and (abs(f2) <= limit):
+         continue
+      if abs(f2-f1)/(abs(f1)+1e-20) > tol:
+         errcode += 1
+
+   if errcode != 0:
+      flog.write("FAILED, %d flows differ significantly\n" % errcode)
+   return errcode
+
+
 def compare_lists( stest, strial, x_col, y_col, tol, l_limit, flog):
    """
     compare x- and y- data of two lists from two files via linear interpolation
@@ -497,6 +548,9 @@ class testcase:
          try:
              if (meth == 'default'):
                 errc = compare_default (s_test, s_trial, tol,l_limit, flog)
+                errcode += errc
+             elif(meth == 'flowcompare'):
+                errc = compare_flows (s_test, s_trial, tol, l_limit, flog)
                 errcode += errc
              elif(meth == 'listcompare'):
                 x_column  = self.checklist[outfile]['x_column']

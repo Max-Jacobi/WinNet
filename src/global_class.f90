@@ -82,12 +82,17 @@ type(nurate_type),dimension(:),allocatable,public :: nurate !< neutrino rates
 
 
 !> Flow type to store flows
-type,public :: flow_vector
-   integer               :: iin !< Index of ingoing nucleus
-   integer               :: iout!< Index of outgoing nucleus
-   real(r_kind)          :: fwd !< Forward flow
-   real(r_kind)          :: bwd !< Backward flow
-end type flow_vector
+type,public :: flow_type
+   integer               :: i      !< Index of ingoing nucleus
+   integer               :: j      !< Index of outgoing nucleus
+   integer               :: zi     !< proton number of ingoing nucleus
+   integer               :: zj     !< proton number of outgoing nucleus
+   integer               :: ni     !< neutron number of ingoing nucleus
+   integer               :: nj     !< neutron number of outgoing nucleus
+   integer               :: ij     !< Index in sparse jacobian
+   integer               :: ji     !< Index in transposed sparse jacobian
+   real(r_kind)          :: fl     !< flow
+end type flow_type
 
 ! -- network-related variables
 integer,public                               :: net_size          !< total number of isotopes (network size)

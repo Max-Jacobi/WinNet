@@ -175,7 +175,8 @@ use parameter_class, only: initial_stepsize, flow_every, T9_analytic,&
                         read_initial_composition, nsetemp_cold,&
                         solver, unit_define,&
                         h_flow_every,initemp_hot,initemp_cold,&
-                        t_analytic, heating_mode
+                        t_analytic, heating_mode,&
+                        cum_flow_every, h_cum_flow_every
 use global_class,    only: net_size, ineu, ipro
 use flow_module,     only: flow_init
 use winnse_module,   only: winnse_guess, nse_init
@@ -238,10 +239,10 @@ logical                               :: init,converged
     call sparse()
 
   ! initialise flow subroutine, has to get called after sparse!
-    if (flow_every.gt.0) then
+    if ((flow_every.gt.0) .or. (cum_flow_every.gt.0)) then
       call flow_init()
 #ifdef USE_HDF5
-    elseif (h_flow_every .gt. 0) then
+    elseif ((h_flow_every .gt. 0) .or. (h_cum_flow_every.gt.0)) then
       call flow_init()
 #endif
     end if
