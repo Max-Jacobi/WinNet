@@ -197,6 +197,28 @@
 
       @see \ref chem_pot.f90, parameter_class::chem_pot_file, \ref use_timmes_mue, \ref weak_rates_file, \ref heating_mode
 
+   \section cum_flow_every                flow_every
+   Outputs the cumulatively integrated nuclear flow that is calculated by:
+    \f[
+    F_{ij} = (J_{ji} \times Y_j - J_{ij} \times Y_i) \Delta t
+    \f]
+    An example of this file may look like:
+    \file{
+                     time                   temp                   dens          cum. timestep
+     3.15360000000000E+07   1.00000000000000E-02   1.25978120803871E-20   6.77877495528052E+07
+    nin  zin                    yin nout zout                   yout     flow [abundance/s]
+      1    0  5.59201756552279E-021    0    1  2.34399420248116E-009  1.15136077038905E-003
+      1    0  5.59201756552279E-021    1    1  9.42670041661705E-011  1.01483947254374E-003
+      0    1  2.34399420248116E-009    1    1  9.42670041661705E-011  1.15143131441659E-003
+      1    1  9.42670041661705E-011    2    1  2.28951249292352E-012  1.01408755527206E-003
+      1    1  9.42670041661705E-011    1    2  1.46006858033863E-013  1.55504930694217E-008
+      1    1  9.42670041661705E-011    2    2  3.44668757329017E-004  1.37223819698075E-004
+      1    2  1.46006858033863E-013    2    1  2.28951249292352E-012  7.77918556479556E-009
+     ...}
+     @par Example template line:
+        ``` cum_flow_every= 10 ```
+     @see parameter_class::cum_flow_every, \ref flow_module, analysis::output_flow
+
    \section custom_snapshots           custom_snapshots
       Boolean parameter that specifies if snapshots should be done only at
       specific points in time. In this way, the whole composition can be printed ,e.g., after one year.
@@ -704,6 +726,15 @@
         [Longland et al. 2014](https://ui.adsabs.harvard.edu/abs/2014A%26A...563A..67L/abstract),
         [Martin, D. 2017](https://tuprints.ulb.tu-darmstadt.de/6301/)
 
+   \section h_cumflow_every        h_flow_every
+   Same as \ref cum_flow_every, but the output is stored in an hdf5 file named "WinNet_data.hdf5". This only
+   works if the hdf5 library is linked properly and the compilerflag -DUSE_HDF5 is set.
+   In case you have installed the h5fc compiler you can change the makefile accordingly to use this compiler
+   and the hdf5 output should work.
+
+   @par Example template line:
+        ``` h_cum_flow_every= 10 ```
+   @see parameter_class::h_cum_flow_every, \ref hdf5_module, \ref cum_flow_every
 
 
 

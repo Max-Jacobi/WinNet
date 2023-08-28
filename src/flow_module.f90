@@ -13,25 +13,45 @@
 !!           - 03.04.18, M. Jacobi   , Rewrote the module, the flows are now
 !!                                     calculated with the help of the Jacobian
 !!           - 22.01.21, M. Reichert , added more comments
+!!           - 25.08.23, M. Jacobi   , cumulativ flow integration
 !! .
 #include "macros.h"
 module flow_module
-  use global_class,    only: net_size, ihe4, ineu, ipro, flow_vector
-  use pardiso_class,   only: jind, vals
+  use error_msg_class,  only: raise_exception
+  use global_class,     only: net_size, ineu, ipro, ihe4, flow_type
+  use pardiso_class,    only: jind, vals
+  use global_class,     only: isotope_type, isotope
+  use parameter_class,  only: flow_every, cum_flow_every
+#ifdef USE_HDF5
+  use parameter_class,  only: h_flow_every, h_cum_flow_every
+#endif
   implicit none
 
+  real(r_kind), parameter :: flow_limit = 1e-99           !< ignore smaller flows in output
+  integer                 :: mode                         !< 1 for flows 2 for cum_flows 3 for both
+                                                          !< will be set automatically on init
+  integer :: flow_size                                    !< size of flow array
+  real(r_kind)  :: cum_dt                                 !< cumulated dt
+  type(flow_type), dimension(:), allocatable, Target :: flows     !> flows
+  type(flow_type), dimension(:), allocatable, Target :: cum_flows !> cumulative flows
 
 
-  type(flow_vector),dimension(:),allocatable, public  :: flows
+  ! arrays for output
+  integer                                 :: output_n_flows !< number of flows in the output
+  integer, dimension(:), allocatable      :: output_n_in    !< neutron number of in isotopes
+  integer, dimension(:), allocatable      :: output_p_in    !< proton number of in isotopes
+  integer, dimension(:), allocatable      :: output_n_out   !< neutron number of out isotopes
+  integer, dimension(:), allocatable      :: output_p_out   !< proton number of out isotopes
+  real(r_kind), dimension(:), allocatable :: output_y_in    !< abundances of in isotopes
+  real(r_kind), dimension(:), allocatable :: output_y_out   !< abundances of out isotopes
+  real(r_kind), dimension(:), allocatable :: output_flow    !< flows
+  real(r_kind)                            :: output_cum_dt  !< cumulative time step
 
   !
   ! Public and private fields and methods of the module
   !
   public:: &
-      flow_init, flowcalc, flowprint
-
-  private:: &
-      flowsort
+      flow_init, flowcalc, flowprint, flowsort
 
 contains
 
@@ -46,47 +66,133 @@ contains
 !! \b Edited:
 !!          - 11.01.14
 !!          - 03.04.18, M. Jacobi
+!!          - 25.08.23, M. Jacobi cumulativ flow integration
 subroutine flow_init()
    implicit none
 
-   integer                               :: ind, i, j
+   integer :: i, j, ij, ji
+   integer :: zi, zj, ni, nj, ai, aj, da
 
    INFO_ENTRY("flow_init")
 
-   ind=0
+   ! set mode for convenience later
+   mode = 0
+   if ((flow_every .gt. 0) &
+#ifdef USE_HDF5
+       .or. (h_flow_every .gt. 0) &
+#endif
+       ) mode = 1
+   if ((cum_flow_every .gt. 0) &
+#ifdef USE_HDF5
+       .or. (h_cum_flow_every .gt. 0) &
+#endif
+       ) mode = mode + 2
 
-   ! Cycle through Jacobian and look at J_ij and J_ji
-   ! Get amount of flow instances
-   do i=1,net_size
-      ! Ignore hydrogen, neutrons and helium
-      if (i.eq.ihe4) cycle
-      if (i.eq.ipro) cycle
-      if (i.eq.ineu) cycle
+   cum_dt = 0
+   ! loop first to find the number of flows
+   flow_size = 0
+   do i = 1, net_size-1
+      ai = isotope(i)%mass
+      do j = i+1, net_size
+         aj = isotope(j)%mass
+         da = aj - ai
 
-      do j=1,net_size
-         if (j.eq.ihe4) cycle
-         if (j.eq.ipro) cycle
-         if (j.eq.ineu) cycle
+         ! exclude flows from projectiles to products but
+         ! include fission flows which should have ai and da > 4
+         if ((abs(da) > ai) .and. (ai <= 4)) cycle
 
-         ! Ignore diagonal
-         if (i.eq.j)    cycle
-         ! Account for entries that are only present at one of the diagonals
-         if (jind(i,j).eq.0) cycle
-         if (i .lt. j) then
-            if (.not. jind(j,i).eq.0) cycle
-         end if
+         ij = jind(i, j)
+         ji = jind(j, i)
+         if ((ij .eq. 0) .and. (ji .eq. 0)) cycle
 
-         ! Count amount of possible flows
-         ind = ind +1
-
+         flow_size = flow_size + 1
       end do
    end do
 
-   allocate (flows(ind))
+   ! allocate flows
+   select case (mode)
+   case (1)
+      allocate(flows(flow_size))
+   case (2)
+      allocate(cum_flows(flow_size))
+   case (3)
+      allocate(flows(flow_size))
+      allocate(cum_flows(flow_size))
+   case default
+      call raise_exception("unknown flow mode (this should never happen)", "flow_init")
+   end select
+
+
+   ! loop again to fill the index arrays
+   flow_size = 0
+   do i = 1, net_size-1
+      ni = isotope(i)%n_nr
+      zi = isotope(i)%p_nr
+      ai = isotope(i)%mass
+      do j = i+1, net_size
+         nj = isotope(j)%n_nr
+         zj = isotope(j)%p_nr
+         aj = isotope(j)%mass
+
+         da = aj - ai
+
+         ! exclude flows from projectiles to products but
+         ! include fission flows which should have ai and da > 4
+         if ((abs(da) > ai) .and. (ai <= 4)) cycle
+
+         ij = jind(i, j)
+         ji = jind(j, i)
+
+         if ((ij .eq. 0) .and. (ji .eq. 0)) cycle
+
+         flow_size = flow_size + 1
+
+         select case (mode)
+            case (1)
+               flows(flow_size)%i = i
+               flows(flow_size)%j = j
+               flows(flow_size)%ij = ij
+               flows(flow_size)%ji = ji
+               flows(flow_size)%zi = zi
+               flows(flow_size)%zj = zj
+               flows(flow_size)%ni = ni
+               flows(flow_size)%nj = nj
+               flows(flow_size)%fl = 0
+            case (2)
+               cum_flows(flow_size)%i = i
+               cum_flows(flow_size)%j = j
+               cum_flows(flow_size)%ij = ij
+               cum_flows(flow_size)%ji = ji
+               cum_flows(flow_size)%zi = zi
+               cum_flows(flow_size)%zj = zj
+               cum_flows(flow_size)%ni = ni
+               cum_flows(flow_size)%nj = nj
+               cum_flows(flow_size)%fl = 0
+            case (3)
+               flows(flow_size)%i = i
+               flows(flow_size)%j = j
+               flows(flow_size)%ij = ij
+               flows(flow_size)%ji = ji
+               flows(flow_size)%zi = zi
+               flows(flow_size)%zj = zj
+               flows(flow_size)%ni = ni
+               flows(flow_size)%nj = nj
+               flows(flow_size)%fl = 0
+
+               cum_flows(flow_size)%i = i
+               cum_flows(flow_size)%j = j
+               cum_flows(flow_size)%ij = ij
+               cum_flows(flow_size)%ji = ji
+               cum_flows(flow_size)%zi = zi
+               cum_flows(flow_size)%zj = zj
+               cum_flows(flow_size)%ni = ni
+               cum_flows(flow_size)%nj = nj
+               cum_flows(flow_size)%fl = 0
+         end select
+      end do
+   end do
 
    INFO_EXIT("flow_init")
-
-   return
 
 end subroutine flow_init
 
@@ -95,8 +201,11 @@ end subroutine flow_init
 !>
 !! Flow calculation from jacobian. It is calculated with the help of the Jacobian.
 !! \f[
-!! F_{ij} = |(1/h - J_{ij}) \times Y_i - (1/h - J_{ji}) \times Y_j|
+!! F_{ij} = (J_{ji} \times Y_j - J_{ij} \times Y_i) \Delta t
 !! \f]
+!!
+!! At each timestep the flows are cumulatively added to the flows and/or cum_flows arrays.
+!! On each output iteration the flows array and the cumulative timestep is reset to zero.
 !!
 !! @note Using the jacobian directly has the advantage
 !!       that the flow will be correct if the calculation
@@ -105,82 +214,160 @@ end subroutine flow_init
 !!
 !! \b Edited:
 !!          - 03.04.18, M. Jacobi
+!!          - 25.08.23, M. Jacobi cumulativ flow integration
 !! .
-subroutine flowcalc(Y)
+subroutine flowcalc(Y, dt)
    implicit none
 
-   real(r_kind),dimension(:),intent(in)  :: Y         !< abundance
-   integer                               :: ind, i, j
+   ! MJ: these could in principle be used from single_zone_vars
+   real(r_kind), dimension(:), intent(in)  :: Y  !< abundances
+   real(r_kind), intent(in)                :: dt !< time step
 
-   INFO_ENTRY("flowcalc")
+   real(r_kind) :: fl
+   integer :: i, j, ij, ji, n
 
-   ind=0
-   ! Cycle through values of the Jacobian and calculate flows
-   do i=1,net_size
-      ! Ignore hydrogen, neutrons and helium
-      if (i.eq.ihe4) cycle
-      if (i.eq.ipro) cycle
-      if (i.eq.ineu) cycle
+   ! update cumulative time step
+   cum_dt = cum_dt + dt
 
-      do j=1,net_size
-         if (j.eq.ihe4) cycle
-         if (j.eq.ipro) cycle
-         if (j.eq.ineu) cycle
-         ! Ignore diagonal
-         if (i.eq.j)    cycle
-         ! Account for entries that are only present at one of the triangle matrix
-         if (jind(i,j).eq.0) cycle
-         if (i .lt. j) then
-            if (.not. jind(j,i).eq.0) cycle
-         end if
+   do n = 1, flow_size
+      if (mode.eq.1) then
+         i = flows(n)%i
+         j = flows(n)%j
+         ij = flows(n)%ij
+         ji = flows(n)%ji
+      else
+         i = cum_flows(n)%i
+         j = cum_flows(n)%j
+         ij = cum_flows(n)%ij
+         ji = cum_flows(n)%ji
+      end if
 
-         ind = ind +1
+      ! add up momentary flows in temporary variable
+      fl = 0
+      if (ij.ne.0) fl = - vals(ij) * Y(i) * dt
+      if (ji.ne.0) fl = fl + vals(ji) * Y(j) * dt
 
-         ! Store the flow i->j
-         flows(ind)%iin  = i
-         flows(ind)%iout = j
-         flows(ind)%fwd  = -vals(jind(i,j))*Y(i)
-
-         ! Store the flow j->i
-         if (jind(j,i).eq.0) then
-            flows(ind)%bwd = 0
-         else
-            flows(ind)%bwd = -vals(jind(j,i))*Y(j)
-         end if
-      end do
+      ! add flow only if it is not abnormally large
+      ! (can sometimnes happen in the beginning)
+      if (abs(fl) < 1e99) then
+      select case (mode)
+      case (1)
+         flows(n)%fl = flows(n)%fl + fl
+      case (2)
+         cum_flows(n)%fl = cum_flows(n)%fl + fl
+      case (3)
+         flows(n)%fl = flows(n)%fl + fl
+         cum_flows(n)%fl = cum_flows(n)%fl + fl
+      end select
+      endif
    end do
 
-   ! Swap fwd and bwd flows if necessary
-   call flowsort()
-
    INFO_EXIT("flowcalc")
-
-   return
 
 end subroutine flowcalc
 
 
-!> Bring flows to correct format
+!>
+!! Sort flows and remove zero flows to prepare them for output.
+!! Updates the output_* arrays.
+!! If cumulative = .true., the cumultive flows are used,
+!! otherwise the momentary flows are used.
+!! In the second case, the flows array and cum_dt are reset to zero.
 !!
-!! Make the flows positive and swap ingoing neutron and proton numbers
-!! in case of negative flows.
-subroutine flowsort
+!!
+!! \b Edited:
+!!         - 25.08.23, M. Jacobi cumulativ flow integration
+!! .
+subroutine flowsort(cumulative)
+   use file_handling_class
+   use single_zone_vars, only: Y
    implicit none
-   integer      :: i    !< Loop variable
-   integer      :: tmp  !< Temporary helper variable for an index
-   real(r_kind) :: ftmp !< Temporary helper variable for a flow
 
-   do i = 1,size(flows)
-      if(flows(i)%bwd.gt.flows(i)%fwd) then
-         ftmp = flows(i)%fwd
-         flows(i)%fwd = flows(i)%bwd
-         flows(i)%bwd = ftmp
-         tmp = flows(i)%iin
-         flows(i)%iin = flows(i)%iout
-         flows(i)%iout = tmp
-      end if
+   logical, intent(in)   :: cumulative !< if true, cumulative flows are used
 
+   integer               :: i, j, n, m
+   real(r_kind)          :: fl
+   type(flow_type), dimension(:), pointer :: flow_ptr
+
+   INFO_ENTRY("flowsort")
+
+   if (cumulative) then
+      flow_ptr => cum_flows
+   else
+      flow_ptr => flows
+   end if
+
+   ! count flows in output and set output_n_flows
+   output_n_flows = 0
+   do n = 1, flow_size
+      fl = flow_ptr(n)%fl
+      ! if flow is used it is normalized to the cumulative dt
+      if (.not. cumulative) fl = fl / cum_dt
+
+      ! cycle flows that are to small
+      if (abs(fl) < flow_limit) cycle
+      output_n_flows = output_n_flows + 1
    end do
+
+   ! allocate output arrays
+   if (allocated(output_n_in)) then
+      deallocate(output_n_in)
+      deallocate(output_p_in)
+      deallocate(output_n_out)
+      deallocate(output_p_out)
+      deallocate(output_y_in)
+      deallocate(output_y_out)
+      deallocate(output_flow)
+   end if
+
+   allocate(output_n_in(output_n_flows))
+   allocate(output_p_in(output_n_flows))
+   allocate(output_n_out(output_n_flows))
+   allocate(output_p_out(output_n_flows))
+   allocate(output_y_in(output_n_flows))
+   allocate(output_y_out(output_n_flows))
+   allocate(output_flow(output_n_flows))
+
+   output_cum_dt = cum_dt
+
+   output_n_flows = 0
+   do n = 1, flow_size
+      fl = flow_ptr(n)%fl
+      if (.not. cumulative) fl = fl / cum_dt
+
+      ! cycle flows that are to small
+      if (abs(fl) < flow_limit) cycle
+      output_n_flows = output_n_flows + 1
+
+      ! set output arrays
+      if (fl > 0) then
+         output_n_in(output_n_flows) = flow_ptr(n)%ni
+         output_p_in(output_n_flows) = flow_ptr(n)%zi
+         output_n_out(output_n_flows) = flow_ptr(n)%nj
+         output_p_out(output_n_flows) = flow_ptr(n)%zj
+         output_y_in(output_n_flows) = Y(flow_ptr(n)%i)
+         output_y_out(output_n_flows) = Y(flow_ptr(n)%j)
+         output_flow(output_n_flows) = fl
+      else ! revert flow
+         output_n_in(output_n_flows) = flow_ptr(n)%nj
+         output_p_in(output_n_flows) = flow_ptr(n)%zj
+         output_n_out(output_n_flows) = flow_ptr(n)%ni
+         output_p_out(output_n_flows) = flow_ptr(n)%zi
+         output_y_in(output_n_flows) = Y(flow_ptr(n)%j)
+         output_y_out(output_n_flows) = Y(flow_ptr(n)%i)
+         output_flow(output_n_flows) = -fl
+      endif
+   end do
+
+   ! reset cumulative timestep and flows
+   if (.not. cumulative) then
+      cum_dt = 0
+      do n = 1, flow_size
+         flows(n)%fl = 0
+      end do
+   endif
+
+   INFO_EXIT("flowsort")
 
 end subroutine flowsort
 
@@ -201,71 +388,54 @@ end subroutine flowsort
 !! \b Edited:
 !!         - 11.01.14
 !!         - 03.04.18, M. Jacobi
+!!         - 25.08.23, M. Jacobi cumulative flow integration
 !! .
-subroutine flowprint(t,t9,dens,abu,cnt)
+subroutine flowprint(t, t9, dens, cnt, cumulative)
    use global_class, only: isotope_type, isotope
    use file_handling_class
    implicit none
 
-   real(r_kind),intent(in)  :: t                !< time [s]
-   real(r_kind),intent(in)  :: t9               !< temperature [GK]
-   real(r_kind),intent(in)  :: dens             !< density [g/cm3]
-   real(r_kind),dimension(:),intent(in)  :: abu !< abundances
-   integer,intent(in)       :: cnt              !< flow snapshot counter
-   !
-   type(isotope_type)    :: nucin,nucout
-   integer               :: i
-   integer               :: ini,ino
-   integer               :: flowunit
-   character*50          :: flowfile
-   real(r_kind)          :: Y_ini, Y_ino, flow_diff
+   real(r_kind), intent(in)  :: t                !< time [s]
+   real(r_kind), intent(in)  :: t9               !< temperature [GK]
+   real(r_kind), intent(in)  :: dens             !< density [g/cm3]
+   integer, intent(in)       :: cnt              !< flow snapshot counter
+   logical, intent(in)       :: cumulative       !< if true, cumulative flows are used
+
+   integer      :: flowunit
+   integer      :: n
+   character*50 :: flowfile
 
    INFO_ENTRY("flowprint")
 
-   select case (cnt)
-   case(:9)
-      write(flowfile,'(a16,i1,a4)')'flow/flow_000',cnt,'.dat'
-   case(10:99)
-      write(flowfile,'(a15,i2,a4)')'flow/flow_00',cnt,'.dat'
-   case(100:999)
-      write(flowfile,'(a14,i3,a4)')'flow/flow_0',cnt,'.dat'
-   case default
-      write(flowfile,'(a13,i4,a4)')'flow/flow_',cnt,'.dat'
-   end select
+   ! prepare flows for output
+   call flowsort(cumulative)
+
+   ! determine filename
+   if (cumulative) then
+      write(flowfile, '(a13, i4.4, a4)')'flow/cum_flow_', cnt, '.dat'
+   else
+      write(flowfile, '(a13, i4.4, a4)')'flow/flow_', cnt, '.dat'
+   endif
+
    flowunit= open_outfile (adjustl(flowfile))
 
-   write(flowunit,'(3a8)')'time','temp','dens'
-   write(flowunit,'(3es23.14)')t,t9,dens
-   write(flowunit,'(7(a8))')'nin','zin','yin','nout','zout','yout',&
-                              'flow'
-   do i = 1,size(flows)
-      ! Declare helper variables
-      ini = flows(i)%iin
-      ino = flows(i)%iout
-      nucin = isotope(ini)
-      nucout = isotope(ino)
+   ! write header
+   write(flowunit, '(4a23)') 'time', 'temp', 'dens', 'cum. timestep'
+   write(flowunit, '(4es23.14)') t, t9, dens, output_cum_dt
+   write(flowunit, '(2(2a5, a23),2a23)') 'nin', 'zin', 'yin', &
+       'nout', 'zout', 'yout', 'flow [abundance/s]'
 
-      ! Make a matching format and prevent something like 1.89-392 instead of 1.89E-392
-      flow_diff = flows(i)%fwd - flows(i)%bwd
-      Y_ino     = abu(ino)
-      Y_ini     = abu(ini)
-      if (abu(ini) .ne.  0.) Y_ini     = max(1.d-99,abu(ini))
-      if (abu(ino) .ne.  0.) Y_ino     = max(1.d-99,abu(ino))
-      if (flow_diff .ne. 0.) flow_diff = max(1.d-99,flows(i)%fwd - flows(i)%bwd)
-
-      if (flow_diff .ne. 0) then
-         write(flowunit,'(2(2i4,es23.14),es23.14)')        &
-              nucin%n_nr,nucin%p_nr,Y_ini,                 &
-              nucout%n_nr,nucout%p_nr,Y_ino,               &
-              flow_diff
-      end if
+   ! write flows
+   do n = 1, output_n_flows
+      write(flowunit,'(2(2i5,es23.14E3),2es23.14E3)') &
+          output_n_in(n), output_p_in(n), output_y_in(n), &
+          output_n_out(n), output_p_out(n), output_y_out(n), &
+          output_flow(n)
    end do
 
-   call close_io_file(flowunit,flowfile)
+   call close_io_file(flowunit, flowfile)
 
    INFO_EXIT("flowprint")
-
-   return
 
 end subroutine flowprint
 
