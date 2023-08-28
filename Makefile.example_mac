@@ -360,7 +360,8 @@ beta_decay_rate_module.o         :\
 hdf5_module.o                    :\
    global_class.o \
    error_msg_class.o \
-   parameter_class.o
+   parameter_class.o \
+   flow_module.o
 
 tw_rate_module.o                 :\
    parameter_class.o \
