@@ -260,7 +260,7 @@ subroutine output_final_step(cnt,ctime,T9,rho_b,entropy,Rkm,Y,pf)
                              timescales_every,nu_loss_every,top_engen_every, &
                              engen_every, h_snapshot_every, h_mainout_every, &
                              h_track_nuclei_every, h_timescales_every, h_flow_every, &
-                             h_nu_loss_every, h_engen_every
+                             h_nu_loss_every, h_engen_every, cum_flow_every
   implicit none
   integer,intent(in)      :: cnt      !< current iteration counter
   real(r_kind),intent(in) :: ctime    !< actual time [s]
@@ -278,6 +278,7 @@ subroutine output_final_step(cnt,ctime,T9,rho_b,entropy,Rkm,Y,pf)
   if (mainout_every.gt.0)      mainout_every= 1
   if (snapshot_every.gt.0)     snapshot_every= 1
   if (flow_every.gt.0)         flow_every= 1
+  if (cum_flow_every.gt.0)     cum_flow_every= 1
   if (timescales_every.gt.0)   timescales_every= 1
   if (track_nuclei_every.gt.0) track_nuclei_every= 1
   if (nu_loss_every.gt.0)      nu_loss_every= 1
@@ -328,14 +329,15 @@ subroutine output_iteration(cnt,ctime,T9,rho_b,entropy,Rkm,Y,pf)
                               top_engen_every,h_snapshot_every,h_mainout_every,&
                               h_custom_snapshots,h_track_nuclei_every,&
                               h_timescales_every,h_flow_every,h_engen_every,&
-                              nu_loss_every, h_nu_loss_every, unit, use_thermal_nu_loss
+                              nu_loss_every, h_nu_loss_every, unit, use_thermal_nu_loss,&
+                              cum_flow_every, h_cum_flow_every
   use nucstuff_class,   only: inter_partf
   use nuclear_heating,  only: output_nuclear_heating,&
                               qdot_nu, qdot_bet, qdot_th
   use thermal_neutrino_module, only: thermal_neutrinos
   use single_zone_vars, only: evolution_mode, stepsize
   use global_class,     only: isotope
-  use flow_module,      only: flowcalc, flows
+  use flow_module,      only: flowcalc, flowprint
 #ifdef USE_HDF5
   use hdf5_module
 #endif
@@ -419,11 +421,28 @@ subroutine output_iteration(cnt,ctime,T9,rho_b,entropy,Rkm,Y,pf)
      end if
   end if
 
+  if (((flow_every.gt.0) .or. (cum_flow_every.gt.0)) &
+      .and. (cnt .ne. 0)) then
+     call flowcalc(Y, stepsize)
+  endif
+
+  ! Update the flow
+  if (((h_flow_every.gt.0) .or. (h_cum_flow_every.gt.0)) &
+      .and. (cnt .ne. 0)) then
+     call flowcalc(Y, stepsize)
+  endif
+
   ! Output the flow
   if ((h_flow_every .gt. 0) .and. (cnt .ne. 0)) then
      if ((mod(cnt,h_flow_every).eq.0)) then
-        call flowcalc(Y)
-        call extend_flow(ctime,T9,rho_b,flows,size(flows),Y)
+        call extend_flow(ctime,T9,rho_b,.false.)
+     end if
+  end if
+
+  ! Output the cumulative flow
+  if ((h_cum_flow_every .gt. 0) .and. (cnt .ne. 0)) then
+     if ((mod(cnt,h_cum_flow_every).eq.0)) then
+        call extend_flow(ctime,T9,rho_b,.true.)
      end if
   end if
 
@@ -471,9 +490,25 @@ subroutine output_iteration(cnt,ctime,T9,rho_b,entropy,Rkm,Y,pf)
      end if
   end if
 
-  if((flow_every.gt.0) .and. (cnt .ne. 0)) then
+  ! Update the flow
+  if (((flow_every.gt.0) .or. (cum_flow_every.gt.0)) &
+      .and. (cnt .ne. 0)) then
+     call flowcalc(Y, stepsize)
+  endif
+
+  ! Output the flow
+  if ((flow_every.gt.0) .and. (cnt.ne.0)) then
      if(mod(cnt,flow_every).eq.0) then
-        call output_flow(ctime,T9,rho_b,Y)
+        call flowprint(ctime,T9,rho_b,flowcnt,.false.)
+        flowcnt = flowcnt + 1
+     end if
+  end if
+
+  ! Output the cumulative flow
+  if ((cum_flow_every.gt.0) .and. (cnt.ne.0)) then
+     if(mod(cnt,cum_flow_every).eq.0) then
+        call flowprint(ctime,T9,rho_b,flowcnt,.true.)
+        flowcnt = flowcnt + 1
      end if
   end if
 
@@ -721,26 +756,6 @@ subroutine output_snapshot(ctime,T9,rho_b,Y)
   call printsnap (ctime,T9,rho_b,Y)
 
 end subroutine output_snapshot
-
-
-!>
-!! Output flow files
-!!
-!! \b Edited:
-!!           - 19.02.20, M. Jacobi
-subroutine output_flow(ctime,T9,rho_b,Y)
-  use flow_module,     only: flowprint, flowcalc
-  implicit none
-
-  real(r_kind),intent(in) :: ctime                 !< current time
-  real(r_kind),intent(in) :: T9                    !< temperature [GK]
-  real(r_kind),intent(in) :: rho_b                 !< density [gcc]
-  real(r_kind),dimension(net_size),intent(in):: Y  !< array of abundances Y_i
-
-  call flowcalc(Y)
-  call flowprint(ctime,T9,rho_b,Y,flowcnt)
-  flowcnt = flowcnt + 1
-end subroutine output_flow
 
 
 !>

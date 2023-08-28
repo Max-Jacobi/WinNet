@@ -209,10 +209,13 @@ module hdf5_module
                   en_det_tot_id
 
    !----------- Flow variables --------------!
-   integer(HID_T),private  :: flow_group_id !< The ID of the group
+   integer(HID_T),private  :: flow_group_id     !< The ID of the group
+   integer(HID_T),private  :: cum_flow_group_id !< The ID of the group
    integer,private         :: iter_flow = 0 !< Iteration count,
                                             !< how often was already
                                             !< extended to the datasets?
+   integer,private         :: iter_cum_flow = 0 !< Iteration count for cum_flows
+
    ! Time
    character(len=*), parameter,private      :: flow_dsetname_t = "time" !< Name of the dataset
    integer(HID_T),private                   :: flow_dset_id_t           !< Dataset identifier
@@ -292,7 +295,8 @@ contains
    subroutine init_hdf5_module()
       use parameter_class, only: h_snapshot_every,h_mainout_every,h_custom_snapshots,&
                                  h_track_nuclei_every,h_timescales_every,h_flow_every,&
-                                 h_finab,h_engen_every,h_engen_detailed,h_nu_loss_every
+                                 h_finab,h_engen_every,h_engen_detailed,h_nu_loss_every,&
+                                 h_cum_flow_every
 
       implicit none
       integer                     :: i_stat  !< status variable
@@ -303,7 +307,7 @@ contains
           (h_mainout_every .gt. 0) .or. (h_track_nuclei_every .gt. 0) .or. &
           (h_timescales_every .gt. 0) .or. (h_flow_every .gt. 0) .or.&
           (h_finab) .or. (h_engen_every .gt. 0) .or. &
-          ((h_nu_loss_every .gt. 0))) then
+          ((h_nu_loss_every .gt. 0) .or. (h_cum_flow_every .gt. 0))) then
           hdf5_output = .True.
       end if
       if (.not. hdf5_output) return
@@ -346,14 +350,18 @@ contains
 
       ! Initialize flow output
       if (h_flow_every .gt. 0) then
-         call init_flow
+         call init_flow(.false.)
+      end if
+
+      if (h_cum_flow_every .gt. 0) then
+         call init_flow(.true.)
       end if
 
       if ((h_nu_loss_every .gt. 0)) then
          call init_nu_loss_gain
       end if
 
-      ! Initialize flow output
+      ! Initialize engen output
       if (h_engen_every .gt. 0) then
          call init_engen(h_engen_detailed)
       end if
@@ -363,17 +371,29 @@ contains
 
 
    !> Initialize the flow output
-   subroutine init_flow
+   subroutine init_flow(cumulative)
       implicit none
+      logical, intent(in), optional    :: cumulative  !< If true, the cumulative flow
+                                                      !< is initialized
+
       integer                          :: i_stat  !< status variable
 
       ! Abundance dataset
       ! Create a group for the snapshots
-      call h5gcreate_f(file_id, "/flows", flow_group_id, i_stat)
-      if (i_stat .ne. 0) then
-         call raise_exception("Unable to create flows group.",&
-                              "init_flow",240005)
-      end if
+      if (cumulative) then
+         call h5gcreate_f(file_id, "/cum_flows", cum_flow_group_id, i_stat)
+         if (i_stat .ne. 0) then
+            call raise_exception("Unable to create cum_flows group.",&
+                "init_flow",240005)
+         end if
+      else
+         call h5gcreate_f(file_id, "/flows", flow_group_id, i_stat)
+         if (i_stat .ne. 0) then
+            call raise_exception("Unable to create flows group.",&
+                "init_flow",240005)
+         end if
+      endif
+
 
    end subroutine init_flow
 
@@ -758,117 +778,61 @@ contains
    !! With every call a new group is created and the flows are written in this
    !! group. The group is named after the calls (the third call is then located
    !! in flows/3)
-   subroutine extend_flow(time,temp,dens,flow,n_flows,Y)
-      use global_class, only: flow_vector,isotope,net_size
+   subroutine extend_flow(time,temp,dens,cumulative)
+      use global_class, only: flow_type,isotope,net_size
+      use flow_module, only: flowsort, output_n_flows, output_cum_dt, &
+          output_n_in, output_p_in, output_y_in, &
+          output_n_out, output_p_out, output_y_out, &
+          output_flow
       implicit none
-      real(r_kind),intent(in)   :: time                          !< Value of the time
-      real(r_kind),intent(in)   :: temp                          !< Value of the time
-      real(r_kind),intent(in)   :: dens                          !< Value of the time
-      integer, intent(in)       :: n_flows                       !< Maximum number of flows
-      type(flow_vector),dimension(n_flows), intent(in)  :: flow  !< Array with already calculated flows
-      real(r_kind),dimension(net_size), intent(in)      :: Y     !< Array with abundances
-      integer                                :: i                !< Loop variable
-      integer                                :: count            !< Amount of non zero flows
-      integer                                :: i_stat           !< IO status variable
-      integer                                :: alloc_stat       !< Allocation status variable
-      real(r_kind)                           :: flow_diff        !< Value of the flow
-      integer,dimension(:),allocatable       :: n_in_nr,p_in_nr  !< Amount of ingoing neutrons and protons
-      integer,dimension(:),allocatable       :: n_out_nr,p_out_nr!< Amount of outgoing neutrons and protons
-      real(r_kind),dimension(:),allocatable  :: flow_in,flow_out !< In/Out-going flow
-      real(r_kind),dimension(:),allocatable  :: Y_in,Y_out       !< In/Out-going abundances
-      integer(HID_T)                         :: tmp_group_id     !< Temporary group id of the flows
-      real(r_kind),dimension(1)              :: helper_time      !< Helper array to store the time
-      real(r_kind),dimension(1)              :: helper_temp      !< Helper array to store the temp
-      real(r_kind),dimension(1)              :: helper_dens      !< Helper array to store the dens
 
-      iter_flow = iter_flow + 1 ! Count the amount of calls
+      real(r_kind),intent(in)   :: time         !< Value of the time
+      real(r_kind),intent(in)   :: temp         !< Value of the time
+      real(r_kind),intent(in)   :: dens         !< Value of the time
+      logical,intent(in)        :: cumulative   !< if true, the cumulative flow is written
+      integer                   :: i            !< Loop variable
+      integer                   :: i_stat       !< IO status variable
+      integer                   :: alloc_stat   !< Allocation status variable
+      integer(HID_T)            :: tmp_group_id !< Temporary group id of the flows
+      real(r_kind),dimension(1) :: helper_time  !< Helper array to store the time
+      real(r_kind),dimension(1) :: helper_temp  !< Helper array to store the temp
+      real(r_kind),dimension(1) :: helper_dens  !< Helper array to store the dens
+      real(r_kind),dimension(1) :: helper_dt    !< Helper array to store the cumulative dt
 
-      ! Initialize count variable
-      count = 0
+      ! Prepare flow output arrays
+      call flowsort(cumulative)
 
-      ! Loop over the flows and count non zero ones
-      do i=1,n_flows
-         flow_diff = flow(i)%fwd - flow(i)%bwd
-         ! Count non zero flows
-         if (flow_diff .ne. 0) count = count + 1
-      end do
-
-      ! Allocate the arrays
-      allocate(n_out_nr(count),stat=alloc_stat)
-      if (alloc_stat .ne. 0) call raise_exception("Allocation of 'n_out_nr' failed!","extend_flow",240001)
-      allocate(p_out_nr(count),stat=alloc_stat)
-      if (alloc_stat .ne. 0) call raise_exception("Allocation of 'p_out_nr' failed!","extend_flow",240001)
-      allocate(flow_out(count),stat=alloc_stat)
-      if (alloc_stat .ne. 0) call raise_exception("Allocation of 'flow_out' failed!","extend_flow",240001)
-      allocate( n_in_nr(count),stat=alloc_stat)
-      if (alloc_stat .ne. 0) call raise_exception("Allocation of 'n_in_nr' failed!","extend_flow",240001)
-      allocate( p_in_nr(count),stat=alloc_stat)
-      if (alloc_stat .ne. 0) call raise_exception("Allocation of 'p_in_nr' failed!","extend_flow",240001)
-      allocate( flow_in(count),stat=alloc_stat)
-      if (alloc_stat .ne. 0) call raise_exception("Allocation of 'flow_in' failed!","extend_flow",240001)
-      allocate( Y_in(count)   ,stat=alloc_stat)
-      if (alloc_stat .ne. 0) call raise_exception("Allocation of 'Y_in' failed!","extend_flow",240001)
-      allocate( Y_out(count)  ,stat=alloc_stat)
-      if (alloc_stat .ne. 0) call raise_exception("Allocation of 'Y_out' failed!","extend_flow",240001)
-
-      ! Loop over the flows and fill the arrays with non zero flows
-      count = 0
-      do i=1,n_flows
-         flow_diff = flow(i)%fwd - flow(i)%bwd
-         ! Count non zero flows
-         if (flow_diff .eq. 0) cycle
-         count = count + 1
-         ! Store ingoing and outgoing quantities
-         n_in_nr(count)  = isotope(flow(i)%iin)%n_nr
-         p_in_nr(count)  = isotope(flow(i)%iin)%p_nr
-         n_out_nr(count) = isotope(flow(i)%iout)%n_nr
-         p_out_nr(count) = isotope(flow(i)%iout)%p_nr
-         flow_out(count) = flow(i)%bwd
-         flow_in(count)  = flow(i)%fwd
-         Y_in(count)     = Y(flow(i)%iin)
-         Y_out(count)    = Y(flow(i)%iout)
-      end do
-      ! Store the time in form of an array with length 1
+      ! Store the time, etc. in form of an array with length 1
       helper_time(1) = time
       helper_temp(1) = temp
       helper_dens(1) = dens
+      helper_dt(1)   = output_cum_dt
 
       ! Abundance dataset
-      ! Calculate net flow here and not in the argument of create_constant_1d_arrays
-      ! in order to avoid annoying warning message
-      flow_in(:) = flow_in(:) - flow_out(:)
-      ! Create a group for the snapshots
-      call h5gcreate_f(file_id, "/flows/"//int_to_str(iter_flow), tmp_group_id, i_stat)
-      call create_constant_1d_int_arrays(count,n_in_nr ,"n_in",tmp_group_id)
-      call create_constant_1d_int_arrays(count,p_in_nr ,"p_in",tmp_group_id)
-      call create_constant_1d_int_arrays(count,n_out_nr,"n_out",tmp_group_id)
-      call create_constant_1d_int_arrays(count,p_out_nr,"p_out",tmp_group_id)
-      call create_constant_1d_arrays(count,flow_in,"flow",tmp_group_id)
+      ! Create a group for the flows or cum_flows
+      if (cumulative) then
+         iter_cum_flow = iter_cum_flow + 1 ! Count the amount of calls
+         call h5gcreate_f(file_id, "/cum_flows/"//int_to_str(iter_cum_flow), tmp_group_id, i_stat)
+      else
+         iter_flow = iter_flow + 1 ! Count the amount of calls
+         call h5gcreate_f(file_id, "/flows/"//int_to_str(iter_flow), tmp_group_id, i_stat)
+      end if
+
+      ! write the time, temp, dens and dt
       call create_constant_1d_arrays(1,helper_time,"time",tmp_group_id)
       call create_constant_1d_arrays(1,helper_temp,"temp",tmp_group_id)
       call create_constant_1d_arrays(1,helper_dens,"dens",tmp_group_id)
-      call create_constant_1d_arrays(count,Y_in,"y_in",tmp_group_id)
-      call create_constant_1d_arrays(count,Y_out,"y_out",tmp_group_id)
+      call create_constant_1d_arrays(1,helper_dt,"dt",tmp_group_id)
+
+      ! write the flow info
+      call create_constant_1d_int_arrays(output_n_flows,output_n_in ,"n_in",tmp_group_id)
+      call create_constant_1d_int_arrays(output_n_flows,output_p_in ,"p_in",tmp_group_id)
+      call create_constant_1d_int_arrays(output_n_flows,output_n_out,"n_out",tmp_group_id)
+      call create_constant_1d_int_arrays(output_n_flows,output_p_out,"p_out",tmp_group_id)
+      call create_constant_1d_arrays(output_n_flows,output_flow,"flow",tmp_group_id)
+      call create_constant_1d_arrays(output_n_flows,output_y_in,"y_in",tmp_group_id)
+      call create_constant_1d_arrays(output_n_flows,output_y_out,"y_out",tmp_group_id)
       call h5gclose_f(tmp_group_id  , i_stat)
-
-
-      ! Deallocate the arrays
-      deallocate(n_out_nr,stat=alloc_stat)
-      if (alloc_stat .ne. 0) call raise_exception("Deallocation of 'n_out_nr' failed!","extend_flow",240002)
-      deallocate(p_out_nr,stat=alloc_stat)
-      if (alloc_stat .ne. 0) call raise_exception("Deallocation of 'p_out_nr' failed!","extend_flow",240002)
-      deallocate(flow_out,stat=alloc_stat)
-      if (alloc_stat .ne. 0) call raise_exception("Deallocation of 'flow_out' failed!","extend_flow",240002)
-      deallocate( n_in_nr,stat=alloc_stat)
-      if (alloc_stat .ne. 0) call raise_exception("Deallocation of 'n_in_nr' failed!","extend_flow",240002)
-      deallocate( p_in_nr,stat=alloc_stat)
-      if (alloc_stat .ne. 0) call raise_exception("Deallocation of 'p_in_nr' failed!","extend_flow",240002)
-      deallocate( flow_in,stat=alloc_stat)
-      if (alloc_stat .ne. 0) call raise_exception("Deallocation of 'flow_in' failed!","extend_flow",240002)
-      deallocate(Y_in ,stat=alloc_stat)
-      if (alloc_stat .ne. 0) call raise_exception("Deallocation of 'Y_in' failed!","extend_flow",240002)
-      deallocate(Y_out,stat=alloc_stat)
-      if (alloc_stat .ne. 0) call raise_exception("Deallocation of 'Y_out' failed!","extend_flow",240002)
 
    end subroutine extend_flow
 
@@ -2098,7 +2062,7 @@ contains
                                  h_custom_snapshots,h_track_nuclei_every,&
                                  h_timescales_every,h_flow_every,&
                                  h_engen_every,h_engen_detailed,&
-                                 h_nu_loss_every
+                                 h_nu_loss_every,h_cum_flow_every
       use global_class,    only: track_nuclei_nr
       implicit none
       integer :: i_stat        !< Status variable
@@ -2280,6 +2244,12 @@ contains
       ! Cleanup flow
       if (h_flow_every .gt. 0) then
          call h5gclose_f(flow_group_id, i_stat)
+         if (i_stat .ne. 0) call raise_exception("Unable to close flow group.",&
+                                                 "hdf5_module_finalize",240017)
+      end if
+
+      if (h_cum_flow_every .gt. 0) then
+         call h5gclose_f(cum_flow_group_id, i_stat)
          if (i_stat .ne. 0) call raise_exception("Unable to close flow group.",&
                                                  "hdf5_module_finalize",240017)
       end if

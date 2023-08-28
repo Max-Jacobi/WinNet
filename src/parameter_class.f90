@@ -63,6 +63,8 @@ module parameter_class
   integer                 :: h_snapshot_every               !< snapshot output frequency in hdf5 format
   integer                 :: flow_every                     !< flow output frequency
   integer                 :: h_flow_every                   !< flow output frequency in hdf5 format
+  integer                 :: cum_flow_every                 !< cumulative flow output frequency
+  integer                 :: h_cum_flow_every               !< cumulatove flow output frequency in hdf5 format
   integer                 :: timescales_every               !< timescales output frequency
   integer                 :: h_timescales_every             !< timescales output frequency in hdf5 format
   integer                 :: engen_every                    !< Energy generation output frequency
@@ -349,6 +351,7 @@ subroutine set_param(param_name,param_value)
       ":fissflag" // &
       ":termination_criterion" // &
       ":flow_every" // &
+      ":cum_flow_every" // &
       ":expansiontype" // &
       ":h_snapshot_every" // &
       ":track_nuclei_every" // &
@@ -363,6 +366,7 @@ subroutine set_param(param_name,param_value)
       ":h_track_nuclei_every"//&
       ":h_timescales_every" // &
       ":h_flow_every" // &
+      ":h_cum_flow_every" // &
       ":h_engen_every" // &
       ":gear_nr_maxcount" // &
       ":iwinterp" // &
@@ -527,6 +531,10 @@ subroutine set_param(param_name,param_value)
      flow_every = read_integer_param(str_value,param_name)
    elseif(param_name.eq."h_flow_every") then
      h_flow_every = read_integer_param(str_value,param_name)
+   elseif(param_name.eq."cum_flow_every") then
+     cum_flow_every = read_integer_param(str_value,param_name)
+   elseif(param_name.eq."h_cum_flow_every") then
+     h_cum_flow_every = read_integer_param(str_value,param_name)
    elseif(param_name.eq."timescales_every") then
      timescales_every = read_integer_param(str_value,param_name)
   elseif(param_name.eq."h_timescales_every") then
@@ -931,6 +939,7 @@ subroutine set_default_param
    bfission_file               = trim(adjustl(win_path))//"FISS_Mumpower"
    calc_nsep_energy            = .false.
    chem_pot_file               = trim(adjustl(win_path))//"chem_table.dat"
+   cum_flow_every              = 0
    custom_snapshots            = .false.
    h_custom_snapshots          = .false.
    engen_every                 = 0
@@ -955,6 +964,7 @@ subroutine set_default_param
    gear_nr_eps                 = 1.0d-6
    gear_ignore_adapt_stepsize  = .true.
    gear_timestep_max           = 10d0
+   h_cum_flow_every            = 0
    h_engen_detailed            = .false.
    h_flow_every                = 0
    h_finab                     = .false.
@@ -1092,6 +1102,7 @@ subroutine output_param
            write(ofile,'(3A)') 'bfission_file               = "', trim(bfission_file),'"'
            write(ofile,'(2A)') 'calc_nsep_energy            = ' , yesno(calc_nsep_energy)
            write(ofile,'(3A)') 'chem_pot_file               = "', trim(chem_pot_file),'"'
+         write(ofile,'(A,I5)') 'cum_flow_every              = ' , cum_flow_every
            write(ofile,'(2A)') 'custom_snapshots            = ' , yesno(custom_snapshots)
            write(ofile,'(3A)') 'detailed_balance_src_ignore = "', trim(detailed_balance_src_ignore),'"'
            write(ofile,'(3A)') 'detailed_balance_src_q_reac = "', trim(detailed_balance_src_q_reac),'"'
@@ -1127,6 +1138,7 @@ subroutine output_param
          write(ofile,'(A,I5)') 'gear_nr_maxcount            = ' , gear_nr_maxcount
          write(ofile,'(A,I5)') 'gear_nr_mincount            = ' , gear_nr_mincount
      write(ofile,'(A,es14.7)') 'gear_timestep_max           ='  , gear_timestep_max
+         write(ofile,'(A,I5)') 'h_cum_flow_every            = ' , h_cum_flow_every
            write(ofile,'(2A)') 'h_custom_snapshots          = ' , yesno(h_custom_snapshots)
            write(ofile,'(2A)') 'h_engen_detailed            = ' , yesno(h_engen_detailed)
          write(ofile,'(A,I5)') 'h_engen_every               = ' , h_engen_every

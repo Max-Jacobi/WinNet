@@ -652,6 +652,9 @@ track_nuclei_every =
 # Output frequency of flow files. This is saved into the folder flow/
 flow_every =
 
+# Output frequency of cumulative flow files. This is saved into the folder flow/
+cum_flow_every =
+
 # Output frequency of snapshots (full list of abundances). This is saved
 # into the folder snaps/
 snapshot_every =
@@ -693,6 +696,9 @@ h_track_nuclei_every =
 
 # Output frequency of flow data into the hdf5 file.
 h_flow_every =
+
+# Output frequency of cumulative flow data into the hdf5 file.
+h_cum_flow_every =
 
 # Output frequency of snapshots (full list of abundances) into the hdf5 file.
 h_snapshot_every =
