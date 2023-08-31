@@ -1631,6 +1631,22 @@ An example file looks like:
    `` read_initial_composition= yes ``
    @see parameter_class::read_initial_composition, \ref seed_file
 
+   \section rate_variation_file       rate_variation_file
+   This file is used to multiply rates with a certain (constant) factor.
+   The file format is as follows:\n
+   chapter parts factor\n
+   A rate variation file may look like this:
+   \file{...
+    5      he4 kr87    n sr90           1.e1
+    5        n sr90  he4 kr87           1.e1
+    ...}
+
+    @note Neutrino and theoretical weak reaction rates
+    can not be varied.
+
+    @par Example template line:
+   `` rate_variation_file= "@WINNET@/data/rate_var.dat" ``
+   @see parameter_class::rate_variation_file, network_init_module::rate_variation
 
    \section rho_analytic               rho_analytic
    Analytic density evolution. This expression is only evaluated when
@@ -2253,6 +2269,24 @@ An example file looks like:
    @par Example template line:
     `` use_tabulated_rates = yes ``
    @see \ref tabulated_rates_file
+
+   \section use_rate_variation        use_rate_variation
+   Use a file to easily vary Reaclib rates by constant factors.
+
+   @par Example template line:
+    `` use_rate_variation = yes ``
+    @see parameter_class::use_rate_variation, \ref rate_variation_file
+
+   \section use_tabulated_rates        use_tabulated_rates
+   Flag whether an extra tabulated rates file should be used. This file is has to be specified with \ref tabulated_rates_file.
+   The output of Talys can be read in this way.
+
+   @warning Reaction rates that are present in the reaclib and in form of tabulated rates will be used from the tabulated rates only.
+
+   @par Example template line:
+    `` use_tabulated_rates = yes ``
+   @see \ref tabulated_rates_file
+
 
   \section use_thermal_nu_loss        use_thermal_nu_loss
    Flag whether thermal neutrino losses are used or not. This parameter will only have an effect if \ref heating_mode is enabled.

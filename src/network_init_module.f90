@@ -59,6 +59,7 @@ subroutine network_init()
   use fission_rate_module,    only: init_fission_rates, merge_fission_rates
   use detailed_balance,       only: merge_inverse_rates, init_inverse_rates
   use parameter_class,        only: net_source
+  use parameter_class,        only: use_rate_variation
   use nuflux_class,           only: init_nuflux, merge_neutrino_rates
   use beta_decay_rate_module, only: init_ext_beta_rates,merge_beta_decays
   use benam_class,            only: get_minmax, get_nuclear_properties
@@ -135,6 +136,12 @@ subroutine network_init()
 
   ! Initialize screening
   call init_screening(nreac)
+
+  ! if given apply rate variation factors to reaction rates
+  if (use_rate_variation) then
+     call rate_variation()
+  end if
+
 
   if (VERBOSE_LEVEL.gt.2) then
      !----- print list of reactions - debug_all-reactions.txt and debug_weak-reactions.txt
@@ -971,6 +978,117 @@ subroutine getnames(ind,names)
 
 end subroutine getnames
 
+
+
+
+!>
+!! This routine is used to vary rates by constant factors.
+!!
+!! The file format is as follows:\n
+!! chapter parts factor\n
+!! A rate variation file may look like this:
+!! \file{...
+!! 5      he4 kr87    n sr90           1.e1
+!! 5        n sr90  he4 kr87           1.e1
+!! ...}
+!!
+!! @warning The specific format is important to keep
+!! @note Neutrino and theoretical weak reaction rates
+!! are currently not supported
+!!
+!! @see parameter_class::use_rate_variation parameter_class::rate_variation_file
+!!
+!! \b Edited:
+!!    - 17.07.22, M.R., Changed the print statement to fit to usual format
+!! .
+subroutine rate_variation()
+  use parameter_class, only: rate_variation_file
+  use global_class, only: rrate, nreac
+  use file_handling_class, only: open_infile, close_io_file
+  use benam_class, only: benam
+
+  integer                    :: i, j, k
+  integer                    :: read_stat
+  integer                    :: group
+  character(5), dimension(6) :: parts
+  integer                    :: nlines      ! number of lines in file
+  integer                    :: nvariations ! true number of variations
+  integer                    :: rate_var_unit
+  real(r_kind)               :: var_fac
+  type reaction_variation
+    integer               :: group
+    integer, dimension(6) :: parts
+    real(r_kind)          :: var_fac
+  end type reaction_variation
+  type(reaction_variation), dimension(:), allocatable :: variations
+
+
+  rate_var_unit = open_infile(rate_variation_file)
+
+  ! Cycle trhough rate variation file once to get number of lines
+  nlines = 0
+  do
+    read(rate_var_unit, "(i1,4x,6a5,1e13.6)", iostat = read_stat) group, parts, var_fac
+    if (read_stat /= 0) exit
+    nlines = nlines + 1
+  end do
+  if (nlines == 0) then
+    close(rate_var_unit)
+    call write_data_to_std_out("Total reaction variations applied", int_to_str(0))
+    return
+  endif
+  allocate(variations(nlines))
+
+  ! Read variations
+  rewind(rate_var_unit)
+  do j = 1, nlines
+    read(rate_var_unit, "(i1,4x,6a5,1e13.6)", iostat = read_stat) group, parts, var_fac
+    if (read_stat /= 0) exit
+    variations(j)%group = group
+    do k = 1, 6
+      variations(j)%parts(k) = benam(parts(k))
+    end do
+    variations(j)%var_fac = var_fac
+  end do
+
+  close(rate_var_unit)
+
+  nvariations = 0
+  ! Apply variations to reaction rates
+  reac_loop: do i = 1, nreac
+
+    ! don't change theoretical weak rates, neutrino rates, and detailed balance rates
+    if ((rrate(i)%reac_src .eq. rrs_nu) .or. &
+        (rrate(i)%reac_src .eq. rrs_twr) .or. &
+        (rrate(i)%reac_src .eq. rrs_detb)) cycle reac_loop
+
+    ! Check if there is a variation for the rate
+    var_file_loop: do j = 1, nlines
+      if (variations(j)%group .ne. rrate(i)%group) cycle var_file_loop
+      if (ANY(variations(j)%parts .ne. rrate(i)%parts)) cycle var_file_loop
+
+      ! change tabulated rates
+      if (rrate(i)%reac_src .eq. rrs_tabl) then
+        rrate(i)%tabulated = rrate(i)%tabulated * variations(j)%var_fac
+      ! change reaclib rates
+      else
+        rrate(i)%param(1) = rrate(i)%param(1) + log(variations(j)%var_fac)
+      endif
+
+      nvariations = nvariations + 1
+      ! exit if all variations are applied
+      if (nvariations == nlines) exit reac_loop
+    end do var_file_loop
+  end do reac_loop
+
+  deallocate(variations)  ! Deallocate variations array
+
+  call write_data_to_std_out("Total reaction variations applied", int_to_str(nvariations))
+  if (nvariations .ne. nlines) then
+    call write_data_to_std_out("Number reaction variations not applied", int_to_str(nlines - nvariations))
+  endif
+
+end subroutine rate_variation
 
 end module network_init_module
 !----------------------------------------------------------------------------
