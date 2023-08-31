@@ -211,6 +211,19 @@ use_tabulated_rates =
 tabulated_rates_file =
 
 
+##################
+# Rate variation #
+##################
+
+# Whether or not to multiply a list of rates with constant factors.
+# (yes/no)
+use_rate_variation =
+
+# Path to a file with the variation factors. Each line contains the
+# reaclib chapter, the participating nuclei, and the factor.
+rate_variation_file =
+
+
 ##########################
 # Additional Beta decays #
 ##########################

@@ -93,6 +93,7 @@ module parameter_class
   logical                 :: use_beta_decay_file            !< switch for using different format for beta decays
   logical                 :: use_prepared_network           !< Use a prepared folder with all necessary data in binary format
   character(max_fname_len):: beta_decay_src_ignore          !< Source flag(s) to ignore within the beta decay file
+  logical                 :: use_rate_variation             !< switch for using rate variation factors
   logical                 :: use_timmes_mue                 !< Use electron chemical potentials from timmes EOS for theoretical weak rates
   logical                 :: use_detailed_balance           !< Calculate the inverse reactions via detailed balance rather than using them form file
   logical                 :: use_detailed_balance_q_reac    !< Use Q-value from reaclib for the calculation of detailed balance
@@ -176,6 +177,7 @@ module parameter_class
   character(max_fname_len):: nurates_file                   !< Neutrino reactions on heavy nuclei as in Sieverding et al. 2018
   character(max_fname_len):: snapshot_file                  !< File that contains days, where a snapshot should be made
   character(max_fname_len):: bfission_file                  !< Fission table for beta-delayed fission
+  character(max_fname_len):: rate_variation_file            !< File that contains variation factors for reaction rates
   character(max_fname_len):: nfission_file                  !< Fission table for neutron-induced fission
   character(max_fname_len):: sfission_file                  !< Fission table for spontaneous fission
   character(max_fname_len):: track_nuclei_file              !< File of nuclei to track. Gives an output similar to mainout.dat
@@ -432,6 +434,7 @@ subroutine set_param(param_name,param_value)
       ":use_alpha_decay_file" // &
       ":alpha_decay_ignore_all"//&
       ":use_neutrino_loss_file" // &
+      ":use_rate_variation"//&
       ":use_thermal_nu_loss"//&
       ":use_prepared_network"
    character(*), parameter :: string_params =  &
@@ -481,6 +484,7 @@ subroutine set_param(param_name,param_value)
       ":tabulated_temperature_file" // &
       ":beta_decay_src_ignore" // &
       ":neutrino_loss_file" // &
+      ":rate_variation_file"//&
       ":prepared_network_path"
 
    logical         :: lparam_value
@@ -682,6 +686,8 @@ subroutine set_param(param_name,param_value)
      use_htpf= lparam_value
    elseif(param_name.eq."h_finab") then
      h_finab= lparam_value
+   elseif(param_name.eq."use_rate_variation") then
+     use_rate_variation= lparam_value
    elseif(param_name.eq."use_timmes_mue") then
      use_timmes_mue= lparam_value
    elseif(param_name.eq."use_tabulated_rates") then
@@ -705,6 +711,8 @@ subroutine set_param(param_name,param_value)
    elseif(param_name.eq."alpha_decay_ignore_all") then
      alpha_decay_ignore_all= lparam_value
 !--- string parameters
+   elseif(param_name.eq."rate_variation_file") then
+     rate_variation_file= trim(str_value)
    elseif(param_name.eq."trajectory_mode") then
      trajectory_mode= trim(str_value)
    elseif(param_name.eq."trajectory_file") then
@@ -995,6 +1003,7 @@ subroutine set_default_param
    nunucleo_rates_file         = trim(adjustl(win_path))//"neunucleons.dat"
    nurates_file                = trim(adjustl(win_path))//"nucross.dat"
    out_every                   = 10
+   rate_variation_file         = "None"
    reaclib_file                = trim(adjustl(win_path))//"Reaclib_18_9_20"
    fission_frag_beta_delayed   = 1
    fission_frag_missing        = 0
@@ -1046,6 +1055,7 @@ subroutine set_default_param
    use_beta_decay_file         = .false.
    use_prepared_network        = .false.
    use_alpha_decay_file        = .false.
+   use_rate_variation          = .false.
    use_thermal_nu_loss         = .True.
    use_timmes_mue              = .True.
    use_detailed_balance        = .false.
@@ -1171,6 +1181,7 @@ subroutine output_param
            write(ofile,'(3A)') 'nurates_file                = "', trim(nurates_file),'"'
          write(ofile,'(A,I5)') 'out_every                   = ' , out_every
            write(ofile,'(3A)') 'prepared_network_path       = "', trim(prepared_network_path),'"'
+           write(ofile,'(3A)') 'rate_variation_file         = "', trim(rate_variation_file),'"'
            write(ofile,'(3A)') 'reaclib_file                = "', trim(reaclib_file),'"'
            write(ofile,'(2A)') 'read_initial_composition    = ' , yesno(read_initial_composition)
            write(ofile,'(3A)') 'rho_analytic                = "', trim(rho_analytic),'"'
@@ -1207,6 +1218,7 @@ subroutine output_param
            write(ofile,'(2A)') 'use_htpf                    = ' , yesno(use_htpf)
            write(ofile,'(2A)') 'use_neutrino_loss_file      = ' , yesno(use_neutrino_loss_file)
            write(ofile,'(2A)') 'use_prepared_network        = ' , yesno(use_prepared_network)
+           write(ofile,'(2A)') 'use_rate_variation          = ' , yesno(use_rate_variation)
            write(ofile,'(2A)') 'use_tabulated_rates         = ' , yesno(use_tabulated_rates)
            write(ofile,'(2A)') 'use_thermal_nu_loss         = ' , yesno(use_thermal_nu_loss)
            write(ofile,'(2A)') 'use_timmes_mue              = ' , yesno(use_timmes_mue)
