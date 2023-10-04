@@ -5,14 +5,16 @@
 # >>> : modify in places marked by '>>>' to fit your system / req's      #
 ##########################################################################
 
+# If the compiler libraries were sourced before, the following
+# lines can be an arbitrary path.
 
 #>>> Path to Intel MKL library
-# If the compiler libraries were sourced before, the following
-# line can be an arbitrary path.
 MKL_DIR = /opt/intel/mkl
+MKL_LIB = $(MKL_DIR)/lib/intel64
+MKL_INC     = $(MKL_DIR)/include
 
-#>>> Machine architecture
-ARCH = 64
+OMP_DIR = /opt/intel/oneapi
+OMP_LIB = $(OMP_DIR)/lib/intel64
 
 # In the following you have to give a compiler
 # A common problem is that anaconda is overwriting the
@@ -25,10 +27,10 @@ ARCH = 64
 # You can take the correct one and fill the full path for "FC" in the lines
 # below.
 
-#>>> Compiler and linker: ifort, ifx, h5fc, h5pfc, or gfortran so far
-FC = ifort
+#>>> Compiler and linker: ifort, h5fc, or gfortran so far
+# FC = ifort
 # FC = ifx
-# FC = h5fc
+FC = h5fc
 # FC = h5pfc
 # FC = gfortran
 
@@ -36,7 +38,7 @@ LD = $(FC)
 FCCOM = $(notdir $(FC))
 
 # Get the git Version
-GIT_TAG:="$(shell git describe --abbrev=0 --tags --always)"
+GIT_TAG:="$(shell git describe --abbrev=0 --tags)"
 GIT_HASH:="$(shell git describe --abbrev=10 --always)"
 
 # Check if the compiler is able to deal with hdf5 files
@@ -73,7 +75,7 @@ else
     hdf5     = false
 endif
 
-# Check if it is an intel compiler, either ifort or ifx
+
 ifeq ($(FCCOM),$(filter $(FCCOM),ifort ifx))
     #>>> Compiler flags: paranoid warning system
     # FFLAGS += -cpp -r8 -align -O0 -Warn all -fpe0 -check all -g -traceback -qopenmp -fp-stack-check -extend-source -heap-arrays -init=snan,arrays -DGHASH=$(GIT_HASH) -DGTAG=$(GIT_TAG)
@@ -103,7 +105,6 @@ SOURCE_PATH = $(WINNET)/src
 TOOL_PATH   = $(WINNET)/src/external_tools
 EOS_PATH    = $(WINNET)/src/eostable_ls_timmes
 NUTH_PATH   = $(WINNET)/src/thermal_neutrinos
-MKL_INC     = $(MKL_DIR)/include
 VPATH       = .
 VPATH      += $(OBJ_PATH)
 VPATH      += $(SOURCE_PATH)
@@ -119,18 +120,8 @@ else
 endif
 FFLAGS += -I$(OBJ_PATH) -I$(MKL_INC)
 
-ifeq ($(ARCH),32)
-  MKL_LIB = $(MKL_DIR)/lib/32
-  FPATH = -L$(MKL_LIB) -I$(MKL_INC)
-  #>>> MKL libraries to link agains; may differ in more recent versions
-  FLIBS = -lmkl_solver_sequential -lmkl_intel -lmkl_sequential \
-          -lmkl_core -lpthread
-else
-  MKL_LIB = $(MKL_DIR)/lib/em64t
-  FPATH = -L$(MKL_LIB) -I$(MKL_INC)
-  #>>> Check that these are correct MKL libraries
-  FLIBS = -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5
-endif
+FPATH = -L$(MKL_LIB) -I$(MKL_INC) -L$(OMP_LIB)
+FLIBS = -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5
 
 # the main target
 PROG = winnet
@@ -241,25 +232,18 @@ TESTS += read_neutrino
 TESTS += switch_evolution
 TESTS += expand
 TESTS += tabulated_rates
-TESTS += tabulated_rates_custom_grid
 TESTS += ulimit
 TESTS += tw_rate
 TESTS += screening
 TESTS += beta_decay_format
-TESTS += fissrate_bdel
 TESTS += fissfrag_kodtak
 TESTS += fissfrag_panov
 TESTS += fissfrag_mumpower
-TESTS += fissfrag_custom
-TESTS += fissfrag_kodtak_n_emission
-TESTS += fissfrag_panov_n_emission
-TESTS += fissfrag_mumpower_n_emission
 TESTS += neutral-current_reaction
 TESTS += charged-current_reaction
 TESTS += nc_cc_reaction
 TESTS += prepared_network
 TESTS += rate_variation
-
 
 # Physical reference cases
 TESTS += bigbang
@@ -378,10 +362,8 @@ tw_rate_module.o                 :\
 fission_rate_module.o                 :\
    parameter_class.o \
    file_handling_class.o \
-   nucstuff_class.o \
    benam_class.o \
    mergesort_module.o \
-   tabulated_rate_module.o \
    format_class.o \
    global_class.o \
    error_msg_class.o
@@ -518,7 +500,6 @@ analysis.o                       :\
    parameter_class.o \
    global_class.o \
    fission_rate_module.o \
-   mergesort_module.o \
    tw_rate_module.o \
    file_handling_class.o \
    ls_timmes_eos_module.o \
