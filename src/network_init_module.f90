@@ -1007,8 +1007,9 @@ subroutine rate_variation()
   use global_class, only: rrate, nreac
   use file_handling_class, only: open_infile, close_io_file
   use benam_class, only: benam
+  use tabulated_rate_module, only: tabulated_rate
 
-  integer                    :: i, j, k
+  integer                    :: i, j, k, tab_ind
   integer                    :: read_stat
   integer                    :: group
   character(5), dimension(6) :: parts
@@ -1070,7 +1071,8 @@ subroutine rate_variation()
 
       ! change tabulated rates
       if (rrate(i)%reac_src .eq. rrs_tabl) then
-        rrate(i)%tabulated = rrate(i)%tabulated * variations(j)%var_fac
+         tab_ind = int(rrate(i)%param(1))
+         tabulated_rate(tab_ind)%tabulated = tabulated_rate(tab_ind)%tabulated * variations(j)%var_fac
       ! change reaclib rates
       else
         rrate(i)%param(1) = rrate(i)%param(1) + log(variations(j)%var_fac)
