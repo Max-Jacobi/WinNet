@@ -268,7 +268,7 @@ ifeq ($(hdf5),true)
     TESTS += hdf5_format
 endif
 
-$(BIN_PATH)/$(PROG): $(OBJ_PATH) $(BIN_PATH) $(OBJS) $(SRCS)
+$(BIN_PATH)/$(PROG): version $(OBJ_PATH) $(BIN_PATH) $(OBJS) $(SRCS)
 	cd $(OBJ_PATH) && \
 	$(LD) $(LDFLAGS) -o $(BIN_PATH)/$(PROG) $(OBJS) -I$(OBJ_PATH) $(FPATH) $(FLIBS)
 
@@ -285,6 +285,9 @@ all: $(BIN_PATH)/$(PROG)
 # UNIX one-liner to automatically list module dependencies:
 # $ grep -i '^ *use' file_handling_class.f90 | sed 's/,//' | awk '{printf ("%s.o\n", $2) }'|sort|uniq
 
+version:
+	@ ((echo "character(80), parameter :: git_tag  = '";git describe --abbrev=0 --tags; echo "'") | tr -d '\n'; echo; \
+	   (echo "character(80), parameter :: git_hash = '";git describe --abbrev=10 --always ; echo "'") | tr -d '\n'; echo) > src/version.inc
 
 file_handling_class.o            :\
    error_msg_class.o
@@ -588,6 +591,6 @@ tests:
 	$(FC) $(FFLAGS) -c $< -o $(OBJ_PATH)/$*.o
 
 clean:
-	rm -rf $(BIN_PATH)/$(PROG) $(OBJS) $(OBJ_PATH)/*
+	rm -rf $(BIN_PATH)/$(PROG) $(OBJS) $(OBJ_PATH)/* src/version.inc
 
 .PHONY: clean all doc tests
