@@ -55,6 +55,8 @@ subroutine write_header()
    character(len=10) :: value_len !< helper string
    character(len=8)  :: unit_len  !< helper string
 
+   include "version.inc"
+
    write(*,*) "              WinNet - Nuclear reaction network"
    write(*,*) "             ==================================="
    if (data_creation_mode) then
@@ -75,13 +77,13 @@ subroutine write_header()
 #ifdef GTAG
    call write_data_to_std_out("Release",STR(GTAG))
 #else
-   call write_data_to_std_out("Release","Unknown")
+   call write_data_to_std_out("Release",git_tag)
 #endif
    ! Output the git hash if known
 #ifdef GHASH
    call write_data_to_std_out("Git hash",STR(GHASH))
 #else
-   call write_data_to_std_out("Git hash","Unknown")
+   call write_data_to_std_out("Git hash",git_hash)
 #endif
 
 end subroutine write_header
