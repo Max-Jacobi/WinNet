@@ -1,0 +1,11 @@
+<map id="network_init_module::rate_variation" name="network_init_module::rate_variation">
+<area shape="rect" id="node1" title="This routine is used to vary rates by constant factors." alt="" coords="5,107,147,149"/>
+<area shape="rect" id="node2" href="$namespacebenam__class.html#ad20c821347dd5f7c08dff59c98e69657" title="Returns the index number of isotope &#39;name&#39;." alt="" coords="199,5,343,32"/>
+<area shape="rect" id="node3" href="$namespacefile__handling__class.html#a01ba26324d7662cc0fb2e0eb306cd3e2" title="Close an external file." alt="" coords="405,107,536,149"/>
+<area shape="rect" id="node4" href="$namespaceerror__msg__class.html#a7e065585cc806a5c264de1f088266498" title="Converts a given integer to a string." alt="" coords="795,107,933,149"/>
+<area shape="rect" id="node6" href="$namespacefile__handling__class.html#aab870caaf9cbaaf635d537708efbf793" title="Same for reading (input file)" alt="" coords="205,166,336,207"/>
+<area shape="rect" id="node8" href="$namespaceerror__msg__class.html#a339dd5b38c125b6a04653762c94a91f2" title="Write data to the standard output (usually OUT)" alt="" coords="195,290,347,331"/>
+<area shape="rect" id="node5" href="$namespaceerror__msg__class.html#a2453d3b7cb363115c046840baa1dfb75" title="Raise a exception with a given error message." alt="" coords="595,166,747,207"/>
+<area shape="rect" id="node7" href="$namespacefile__handling__class.html#af02196bd5eaf70ecd5ab4cc650094d5e" title="Finds the next unused unit number." alt="" coords="405,225,536,266"/>
+<area shape="rect" id="node9" href="$namespaceerror__msg__class.html#af62b9a0c5997255e792b9ebd7322a6a3" title="Write the header of the standard output (usually OUT)" alt="" coords="395,290,547,331"/>
+</map>
