@@ -120,6 +120,7 @@ var NAVTREE =
       [ "heating_density", "parameters.html#heating_density", null ],
       [ "heating_mode", "parameters.html#heating_mode", null ],
       [ "heating_frac", "parameters.html#heating_frac", null ],
+      [ "heating_T9_tol", "parameters.html#heating_T9_tol", null ],
       [ "htpf_file", "parameters.html#htpf_file", null ],
       [ "initemp_cold", "parameters.html#initemp_cold", null ],
       [ "initemp_hot", "parameters.html#initemp_hot", null ],
@@ -232,7 +233,7 @@ var NAVTREE =
       [ "Class Hierarchy", "hierarchy.html", "hierarchy" ],
       [ "Data Fields", "functions.html", [
         [ "All", "functions.html", "functions_dup" ],
-        [ "Functions/Subroutines", "functions_func.html", null ],
+        [ "Functions/Subroutines", "functions_func.html", "functions_func" ],
         [ "Variables", "functions_vars.html", "functions_vars" ]
       ] ]
     ] ],
@@ -251,17 +252,19 @@ var NAVTREEINDEX =
 [
 "DockerUsage.html",
 "Example__hydrostatic__hydrogen__burning_2scripts_2Plot__me_8py.html#aae6215e6246e894c74949ae707c2e7b3",
-"class__files_2____init_____8py_source.html",
-"classbin_1_1class__files_1_1winnet__class_1_1winnet.html#afbc2f828378a0f8f5d4ba1150ce65bba",
-"detailed__balance_8f90.html#a950b42c1476c5e9a7aac95d656b3d4b1",
-"fission__rate__module_8f90.html#ac563196db55b412fc34166701790593e",
-"hdf5__module_8f90.html#a0e68982ce34aa3fe0cbd571e6c3e542f",
-"ls__timmes__eos__module_8f.html#a6867edd9f714d2e03ef3f07962919c7c",
-"namespacepardiso__class.html",
-"parameter__class_8f90.html#a5cb9a4a158db5f85bc7ed50f560109d7",
-"pardiso__class_8f90.html#a374c82c36ac94f0d16d6cbf353c1568b",
-"single__zone__vars_8f90.html#a7e1179eee2f5d227a5a24fefd58e9532",
-"thermal__neutrino__module_8f90.html#a22c1f79df228c93e91ee2bb903ca315e"
+"charged-current__reaction_8py.html#ad7159fb70a880dcb510f5b1450b0732e",
+"classbin_1_1class__files_1_1winnet__class_1_1winnet.html#ad7762710b645cbd379011a2825d82d0c",
+"classsrc__files_1_1nucleus__multiple__class_1_1nucleus__multiple.html#a6dff6291442201c9a72f4e428070ed54",
+"detailed__balance_8f90.html#acba78fea82b136053ab51e24cee093ee",
+"fission__rate__module_8f90.html#ac83b342589c9f90bde898cfbc1b899fe",
+"globals_func.html",
+"jacobian__class_8f90.html#a28af27c67392298788fdfa4023fe87c7",
+"namespacemembers_vars_g.html",
+"parameter__class_8f90.html#a0c7fb721340dec64d0ec8bcbfe0cb37b",
+"parameters.html#nse_calc_every",
+"ref__nsm_8py_source.html",
+"structunits__module_1_1units__in__cgs.html#a9d8b0911a209205c2099b41363b269d9",
+"winnse__module_8f90_source.html"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';
