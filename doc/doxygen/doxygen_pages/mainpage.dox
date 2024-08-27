@@ -18,16 +18,16 @@
 WinNet is a single zone nuclear reaction network, capable of calculating many
 different nucleosynthesis processes (i.e., r-process, nup-process, explosive
 nucleosynthesis, and many more). Please read and cite
-[Reichert et al. 2023](https://ui.adsabs.harvard.edu/abs/2023arXiv230507048R/abstract) when you use this network. A brief overview 
+[Reichert et al. 2023](https://ui.adsabs.harvard.edu/abs/2023arXiv230507048R/abstract) when you use this network. A brief overview
 of the code is also given at the [How it works](\ref how_it_works) documentation page.
-When using the code check your parameter file if you used any other input file within 
-your calculation that require you to cite. A list of input files with the respective 
-literature can be found at the [Input files](\ref input_files) documentation page. 
+When using the code check your parameter file if you used any other input file within
+your calculation that require you to cite. A list of input files with the respective
+literature can be found at the [Input files](\ref input_files) documentation page.
 We tried our best to produce a reliable code, but nevertheless we
 stress that this code comes with no warranty!
 
 
-    
+
 \subsection prerequisits Prerequisits
 To run WinNet you need a Fortran compiler and the Math Kernel Library (MKL). The procedure of installing both can be different for Linux, Mac, and Windows. Therefore, in order to install WinNet on Linux follow the instruction [here](\ref linux_install), for Mac [here](\ref mac_install), and for Windows [here](\ref windows_install). You can also follow the instructions [here](\ref DockerUsage) to directly download a Docker image from GitHub packages and run WinNet inside a docker container.
 
@@ -44,9 +44,9 @@ If you have installed python, you can run "make tests" and all tests should pass
 \subsection parameter The parameter file
 The interface between the user and the code is given in the form of parameter files.
 Examples of those files can be found in the _par/_ folder. Within these files,
-you can change all the input to the code. There also exist a blank template file with all 
+you can change all the input to the code. There also exist a blank template file with all
 parameters and a short description in par/template.par. An overview of all valid parameters is
-given [here](\ref parameters). 
+given [here](\ref parameters).
 
 \subsection example_cases Example cases
 WinNet comes with a variety of example cases. To access them you can rename the _makerun.py.example_ into _makerun.py_.
@@ -70,7 +70,7 @@ The _makerun.py_ script will also ask you if you want to monitor the simulation.
 Otherwise, you can monitor the progress using the "tail -f" command, for instance:
 
     tail -f $WINNET/runs/Example_BigBang/OUT
-    
+
 
 \subsection create_movie Creating Movies
 

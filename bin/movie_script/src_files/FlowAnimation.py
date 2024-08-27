@@ -945,6 +945,18 @@ class FlowAnimation(object):
         if self.plot_addmainout:
             self.__init_data_addmainout(-1)
 
+        # Set up energy data
+        if self.plot_energy:
+            self.energy_time = self.wreader.energy['time']
+            self.energy_data = [ self.wreader.energy['engen_'+self.energy_entries[i]] for i in range(len(self.energy_entries)) ]
+
+        # Set up tracked nuclei data
+        if self.plot_tracked:
+            self.tracked_time = self.wreader.tracked_nuclei['time']
+            self.track_nuclei_data  = [ self.wreader.tracked_nuclei[n] for n in self.wreader.tracked_nuclei['names'] ]
+            self.track_nuclei_labels= self.wreader.tracked_nuclei['latex_names']
+
+
         # Set up mainout data
         if self.plot_mainout:
             self.mainout_time        = self.wreader.mainout['time']
@@ -1036,7 +1048,6 @@ class FlowAnimation(object):
                 with np.errstate(divide='ignore'):
                     arrowwidth = (np.log10(self.flow)-np.log10(self.flow_min))*width
                     arrowwidth = np.maximum(arrowwidth, self.flow_minArrowWidth)
-
 
                 flow_arrows = [Arrow(self.flow_N[i],self.flow_Z[i],self.flow_dn[i],self.flow_dz[i],width=arrowwidth[i],color='k') for i in range(len(self.flow))]
                 a = PatchCollection(flow_arrows, cmap=self.cmapNameFlow, norm=self.flow_norm)
@@ -1143,6 +1154,20 @@ class FlowAnimation(object):
         # Plot the tracked nuclei
         if self.plot_tracked:
             self.__init_plot_tracked()
+
+        # Plot the energy
+        if self.plot_energy:
+            self.energy_plot = [self.axEnergy.plot(self.energy_time,self.energy_data[i], color=self.energy_colors[i],
+                                                   label=self.energy_labels[i], lw=self.energy_lw[i]) for i in range(len(self.energy_data))]
+            # Also make the background of the box non-transparent
+            self.axEnergy.legend(loc='upper right', ncol=2, bbox_to_anchor=(1.3, 1.0), frameon=True, facecolor='white', edgecolor='black', framealpha=1.0, fontsize=8)
+
+        # Plot the tracked nuclei
+        if self.plot_tracked:
+            self.tracked_plot = [self.axTracked.plot(self.tracked_time,self.track_nuclei_data[i],
+                                                   label=self.track_nuclei_labels[i]) for i in range(len(self.track_nuclei_labels))]
+            # Also make the background of the box non-transparent
+            self.axTracked.legend(loc='upper right', ncol=2, bbox_to_anchor=(1.3, 1.0), frameon=True, facecolor='white', edgecolor='black', framealpha=1.0, fontsize=8)
 
         # Plot magic numbers
         if self.plot_magic:
