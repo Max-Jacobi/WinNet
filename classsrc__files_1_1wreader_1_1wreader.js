@@ -11,6 +11,7 @@ var classsrc__files_1_1wreader_1_1wreader =
     [ "__read_nr_of_snaps", "classsrc__files_1_1wreader_1_1wreader.html#afa6b7efde991c9a87d5b943be077d716", null ],
     [ "__read_snapshots", "classsrc__files_1_1wreader_1_1wreader.html#a2f6c8d27b3383c5e072291ed76f6f028", null ],
     [ "__read_timescales", "classsrc__files_1_1wreader_1_1wreader.html#a394335d4af61eb19c03cde0fe4acdb7f", null ],
+    [ "__read_tracked_nuclei", "classsrc__files_1_1wreader_1_1wreader.html#aa1832c02508a15d0e13da3520d63e36e", null ],
     [ "A", "classsrc__files_1_1wreader_1_1wreader.html#ad04c014409f4650b0a44de17938f8166", null ],
     [ "check_existence", "classsrc__files_1_1wreader_1_1wreader.html#a6cc2d629d39d6f1c36f484c8718449e0", null ],
     [ "energy", "classsrc__files_1_1wreader_1_1wreader.html#af0bbd0624c9c20bffb25e13034b80d31", null ],
@@ -23,6 +24,7 @@ var classsrc__files_1_1wreader_1_1wreader =
     [ "nr_of_snaps", "classsrc__files_1_1wreader_1_1wreader.html#a6652c0630c2d8a33b00764154aefaa8d", null ],
     [ "snapshot_time", "classsrc__files_1_1wreader_1_1wreader.html#a59fc9c8db79c89c8d29821172354759f", null ],
     [ "tau", "classsrc__files_1_1wreader_1_1wreader.html#afeacebcebd5d8ce25e463f9dfcd40db6", null ],
+    [ "tracked_nuclei", "classsrc__files_1_1wreader_1_1wreader.html#ab4be4b0f098062ef90d44c428043a0e8", null ],
     [ "X", "classsrc__files_1_1wreader_1_1wreader.html#a33e88142fae954d2e2801b354ed02395", null ],
     [ "Y", "classsrc__files_1_1wreader_1_1wreader.html#aadf0b5221e78a9df6c3f4716e8f9fde2", null ],
     [ "Z", "classsrc__files_1_1wreader_1_1wreader.html#a27442333f42e255caca3cd60b4681070", null ],
@@ -40,6 +42,7 @@ var classsrc__files_1_1wreader_1_1wreader =
     [ "__snapshots_X", "classsrc__files_1_1wreader_1_1wreader.html#a0f83d578154b3f625492da80b80c02c0", null ],
     [ "__snapshots_Y", "classsrc__files_1_1wreader_1_1wreader.html#a42af71697a05eed93462159bb539021b", null ],
     [ "__timescales", "classsrc__files_1_1wreader_1_1wreader.html#ac683a795a4362afc6519e27b951f9751", null ],
+    [ "__tracked_nuclei", "classsrc__files_1_1wreader_1_1wreader.html#a917fdd72431e6d652120c1c35d338f5b", null ],
     [ "__Z", "classsrc__files_1_1wreader_1_1wreader.html#a1f0c90680674a7b1903e9ead530f138a", null ],
     [ "filename", "classsrc__files_1_1wreader_1_1wreader.html#aeb815da9c2838c9d885ad2e9bbef0495", null ],
     [ "path", "classsrc__files_1_1wreader_1_1wreader.html#ab243fc4132557e484633be9d3d9cc089", null ]

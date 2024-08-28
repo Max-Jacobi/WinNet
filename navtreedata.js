@@ -33,6 +33,7 @@ var NAVTREE =
         [ "The parameter file", "index.html#parameter", null ],
         [ "Example cases", "index.html#example_cases", null ],
         [ "Monitoring simulations", "index.html#monitoring_simulations", null ],
+        [ "Creating Movies", "index.html#create_movie", null ],
         [ "Compiling a local version of the documentation", "index.html#compile_docs", null ],
         [ "List of publications", "index.html#publications", null ]
       ] ]
@@ -254,17 +255,17 @@ var NAVTREEINDEX =
 "Example__hydrostatic__hydrogen__burning_2scripts_2Plot__me_8py.html#aae6215e6246e894c74949ae707c2e7b3",
 "charged-current__reaction_8py.html#ad7159fb70a880dcb510f5b1450b0732e",
 "classbin_1_1class__files_1_1winnet__class_1_1winnet.html#ad7762710b645cbd379011a2825d82d0c",
-"classsrc__files_1_1nucleus__multiple__class_1_1nucleus__multiple.html#a6dff6291442201c9a72f4e428070ed54",
-"detailed__balance_8f90.html#acba78fea82b136053ab51e24cee093ee",
-"fission__rate__module_8f90.html#ac83b342589c9f90bde898cfbc1b899fe",
-"globals_func.html",
-"jacobian__class_8f90.html#a28af27c67392298788fdfa4023fe87c7",
-"namespacemembers_vars_g.html",
-"parameter__class_8f90.html#a0c7fb721340dec64d0ec8bcbfe0cb37b",
-"parameters.html#nse_calc_every",
-"ref__nsm_8py_source.html",
-"structunits__module_1_1units__in__cgs.html#a9d8b0911a209205c2099b41363b269d9",
-"winnse__module_8f90_source.html"
+"classsrc__files_1_1nucleus__class_1_1nucleus.html#a7b49a49a6c14003d7e078c349281f44a",
+"create__trajectory_8py.html",
+"fissfrag__panov__n__emission_8py.html#a64fc7a95a0cf7eea49d49d887c16c355",
+"gear__module_8f90.html#ab3f9c438be424fb461b8a90dd3381ddf",
+"input_files.html#bet_moeller",
+"namespacemembers_func_m.html",
+"nuflux__class_8f90.html#adfc2ce9c49a6c8111db6fa99051cf5f0",
+"parameters.html#gear_nr_maxcount",
+"read__seeds_8py.html#a05f5bcd178dbe2b774e6574b7f6606a9",
+"structtw__rate__module_1_1weakrate__type.html#a28620a55aa85a12601224a1e09918fdc",
+"winnet__movie_8py.html#a632f0c80686427552ec8970e5e30938e"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';
