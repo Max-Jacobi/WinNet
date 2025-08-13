@@ -13,8 +13,10 @@ MKL_DIR = /opt/intel/mkl
 MKL_LIB = $(MKL_DIR)/lib/intel64
 MKL_INC     = $(MKL_DIR)/include
 
-OMP_DIR = /opt/intel/oneapi
-OMP_LIB = $(OMP_DIR)/lib/intel64
+INC = "/usr/include"
+
+OMP_DIR = /opt/intel/oneapi/compiler/2025.0
+OMP_LIB = $(OMP_DIR)/lib
 
 # In the following you have to give a compiler
 # A common problem is that anaconda is overwriting the
@@ -118,10 +120,10 @@ ifeq ($(FCCOM),$(filter $(FCCOM),ifort ifx))
 else
     FFLAGS     += -J$(OBJ_PATH)
 endif
-FFLAGS += -I$(OBJ_PATH) -I$(MKL_INC)
+FFLAGS += -I$(OBJ_PATH) -I$(MKL_INC) -I$(INC)
 
-FPATH = -L$(MKL_LIB) -I$(MKL_INC) -L$(OMP_LIB)
-FLIBS = -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5
+FPATH = -L$(MKL_LIB) -I$(MKL_INC) -I$(INC) -L$(OMP_LIB)
+FLIBS = -lmkl_intel_lp64 -lmkl_core -lmkl_intel_thread  -liomp5
 
 # the main target
 PROG = winnet
@@ -362,6 +364,7 @@ tw_rate_module.o                 :\
 fission_rate_module.o                 :\
    parameter_class.o \
    file_handling_class.o \
+   tabulated_rate_module.o \
    benam_class.o \
    mergesort_module.o \
    format_class.o \
