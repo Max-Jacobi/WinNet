@@ -54,8 +54,7 @@ subroutine thermal_neutrino_init()
   real(r_kind)  :: dummy
   real(r_kind)  :: abar
   real(r_kind)  :: ye
-  integer       :: id_debug
-  real(r_kind)  :: i
+  integer       :: i, id_debug
 
   ! Only do something if the parameters are enabled
   if ((use_thermal_nu_loss) .and. (heating_mode .gt. 0)) then
@@ -78,8 +77,8 @@ subroutine thermal_neutrino_init()
         temp = 5e-1
         abar = 14
         ye   = 0.5
-        do i=0,12,0.01
-            rho = 10**i
+        do i=0,1200
+            rho = 10**(i*0.01)
             call thermal_neutrinos(abar,ye,temp,rho,1d0,dummy)
             write(id_debug,"(*(E15.5E3,3x))") temp,rho,snu,spair,splas,sphot,sbrem,sreco
         end do
