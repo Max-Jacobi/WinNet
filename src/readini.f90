@@ -25,7 +25,8 @@ module readini
   private :: read_custom_snapshots, read_track_nuclei, time_unit_conversion, &
              temp_unit_conversion, dens_unit_conversion, dist_unit_conversion, &
              nutemp_unit_conversion, nuenergy_unit_conversion, &
-             nulumin_unit_conversion, consistency_check, custom_read
+             nulumin_unit_conversion, nuflux_unit_conversion, &
+             flux_to_lumin, consistency_check, custom_read
 
   contains
 
@@ -838,6 +839,61 @@ end function nulumin_unit_conversion
 
 
 !>
+!! Function to convert from a given neutrino number flux unit to 1/cm^2/s
+!!
+!! ### Example
+!!~~~~~~~~~~~~~~.f90
+!! b = nuflux_unit_conversion("1/cm^2/s")
+!!~~~~~~~~~~~~~~
+!! b will be \f$ 1 \f$ as it is the conversion from 1/cm^2/s to 1/cm^2/s.
+!!
+!! @note New (anti-)neutrino number flux units can be defined here.
+function nuflux_unit_conversion(unit)
+  use parameter_class, only: trajectory_format
+  implicit none
+  character(len=*),intent(in) :: unit                     !< Input unit
+  real(r_kind)                :: nuflux_unit_conversion   !< Conversion factor to obtain 1/cm^2/s
+
+  select case (trim(adjustl(unit)))
+     case('')
+        nuflux_unit_conversion = 1.0
+     case('-')
+        nuflux_unit_conversion = 1.0
+     case('1/cm^2/s')
+        nuflux_unit_conversion = 1.0
+     case('1/m^2/s')
+        nuflux_unit_conversion = 1.0d-4
+     case default
+        call raise_exception('Problem when analyzing: "'//&
+                             trim(adjustl(trajectory_format))//'". '//NEW_LINE('A')//&
+                             'Neutrino number flux unit "'//&
+                             trim(adjustl(unit))//'" unknown.',"nuflux_unit_conversion",&
+                             390025)
+  end select
+end function nuflux_unit_conversion
+
+
+!>
+!! Converts a neutrino number flux at a given radius into a luminosity
+!!
+!! Internally the code always works with neutrino luminosities, which are
+!! turned back into a flux at the current radius in \ref nuflux_class::nuflux.
+!! Since the luminosity is kept constant once the trajectory has ended, the
+!! flux drops with 1/r^2 during the extrapolation.
+function flux_to_lumin(flux,rad,tnu)
+  use parameter_class, only: unit
+  implicit none
+  real(r_kind),intent(in) :: flux          !< Neutrino number flux [1/cm^2/s]
+  real(r_kind),intent(in) :: rad           !< Radius [km]
+  real(r_kind),intent(in) :: tnu           !< Neutrino temperature [MeV]
+  real(r_kind)            :: flux_to_lumin !< Neutrino luminosity [erg/s]
+
+  ! The average neutrino energy is 3.15 times the neutrino temperature
+  flux_to_lumin = flux*4d0*unit%pi*(rad*1d5)**2 * tnu*3.151374374d0/unit%ergtomev
+end function flux_to_lumin
+
+
+!>
 !! Reads the trajectory file.
 !!
 !! The columns and structure of the file is determined by the user
@@ -873,12 +929,16 @@ end function nulumin_unit_conversion
 !! - tnue   : Electron neutrino temperatures (MeV)
 !! - eanue  : Anti-electron neutrino energies (MeV)
 !! - enue   : Electron neutrino energies (MeV)
+!! - fanue  : Anti-electron neutrino number fluxes (1/cm^2/s)
+!! - fnue   : Electron neutrino number fluxes (1/cm^2/s)
 !! - lanux  : Anti-neutrino luminosities of heavy neutrinos (erg/s)
 !! - lnux   : Neutrino luminosities  of heavy neutrinos (erg/s)
 !! - tanux  : Anti-neutrino temperatures  of heavy neutrinos (MeV)
 !! - tnux   : Neutrino temperatures of heavy neutrinos (MeV)
 !! - eanux  : Anti-neutrino energies of heavy neutrinos (MeV)
 !! - enux   : Neutrino energies of heavy neutrinos (MeV)
+!! - fanux  : Anti-neutrino number fluxes of heavy neutrinos (1/cm^2/s)
+!! - fnux   : Neutrino number fluxes of heavy neutrinos (1/cm^2/s)
 !! - skip   : skip a column
 !! .
 !! </pre>
@@ -920,6 +980,7 @@ subroutine custom_read()
    logical                                  :: ls_x,ls_y,ls_z,ls_ye             !< which column is it logarithmic?
    logical                                  :: ls_Tnue,ls_Tanue,ls_Lnue,ls_Lanue!< which column is it logarithmic?
    logical                                  :: ls_Tnux,ls_Tanux,ls_Lnux,ls_Lanux!< which column is it logarithmic?
+   logical                                  :: fl_nue,fl_anue,fl_nux,fl_anux    !< Number fluxes given instead of luminosities?
    integer                                  :: skip_count                       !< Check how many lines to skip
    logical                                  :: skipping                         !< Helper variable
    character(max_fname_len)                 :: help_reader                      !< Helper variable
@@ -995,6 +1056,9 @@ subroutine custom_read()
    ! Same for the heavy neutrinos
    nuxtemp_i  = 0; anuxtemp_i = 0
    Lnux_i     = 0; Lanux_i    = 0
+   ! By default luminosities and not number fluxes are given
+   fl_nue = .false.; fl_anue = .false.
+   fl_nux = .false.; fl_anux = .false.
 
    ! Get correct index from the columns and count them
    current_col = ''
@@ -1103,6 +1167,18 @@ subroutine custom_read()
             ls_lanue= log_switch !check if it should be logarithmic
             ! Get the conversion factor to erg/s
             conv_Lanue= nulumin_unit_conversion(trim(adjustl(col_unit)))
+         case('fnue')
+            Lnue_i = col_count
+            ls_lnue= log_switch !check if it should be logarithmic
+            fl_nue = .true.     !number flux instead of luminosity
+            ! Get the conversion factor to 1/cm^2/s
+            conv_Lnue= nuflux_unit_conversion(trim(adjustl(col_unit)))
+         case('fanue')
+            Lanue_i = col_count
+            ls_lanue= log_switch !check if it should be logarithmic
+            fl_anue = .true.     !number flux instead of luminosity
+            ! Get the conversion factor to 1/cm^2/s
+            conv_Lanue= nuflux_unit_conversion(trim(adjustl(col_unit)))
          case("tnux")
             nuxtemp_i = col_count !index of the column
             ls_tnux   = log_switch !check if it should be logarithmic
@@ -1133,6 +1209,18 @@ subroutine custom_read()
             ls_lanux= log_switch !check if it should be logarithmic
             ! Get the conversion factor to erg/s
             conv_Lanux= nulumin_unit_conversion(trim(adjustl(col_unit)))
+         case("fnux")
+            Lnux_i = col_count
+            ls_lnux= log_switch !check if it should be logarithmic
+            fl_nux = .true.     !number flux instead of luminosity
+            ! Get the conversion factor to 1/cm^2/s
+            conv_Lnux= nuflux_unit_conversion(trim(adjustl(col_unit)))
+         case("fanux")
+            Lanux_i = col_count
+            ls_lanux= log_switch !check if it should be logarithmic
+            fl_anux = .true.     !number flux instead of luminosity
+            ! Get the conversion factor to 1/cm^2/s
+            conv_Lanux= nuflux_unit_conversion(trim(adjustl(col_unit)))
          case('skip')
             continue
          case default
@@ -1294,6 +1382,12 @@ subroutine custom_read()
          if (.not. ls_lanue) nlumebar(i) = row_read(Lanue_i)
          nlumebar(i) = nlumebar(i)*conv_Lanue
 
+         ! If number fluxes were given, turn them into luminosities. Internally
+         ! the code always works with luminosities, which are kept constant when
+         ! the trajectory is extrapolated. The flux then drops with 1/r^2 there.
+         if (fl_nue)  nlume(i)    = flux_to_lumin(nlume(i)   ,zrad(i),tnue(i))
+         if (fl_anue) nlumebar(i) = flux_to_lumin(nlumebar(i),zrad(i),tnuebar(i))
+
          ! Avoid small and negative numbers
          if (nlume(i).le.0.d0) nlume(i)       = tny
          if (nlumebar(i).le.0.d0) nlumebar(i) = tny
@@ -1321,6 +1415,10 @@ subroutine custom_read()
         if (ls_lanux)      nlumxbar(i) = 10**row_read(Lanux_i)
         if (.not. ls_lanux) nlumxbar(i) = row_read(Lanux_i)
         nlumxbar(i) = nlumxbar(i)*conv_Lanux
+
+        ! Same conversion as for the electron (anti-)neutrinos above
+        if (fl_nux)  nlumx(i)    = flux_to_lumin(nlumx(i)   ,zrad(i),tnux(i))
+        if (fl_anux) nlumxbar(i) = flux_to_lumin(nlumxbar(i),zrad(i),tnuxbar(i))
 
         ! Avoid small and negative numbers
         if (nlumx(i).le.0.d0) nlumx(i)       = tny

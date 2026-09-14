@@ -2145,6 +2145,10 @@ An example file looks like:
     <tr><td> rad    <td> The radius (km) of the trajectory
     <tr><td> x,y,z  <td> x, y, and z coordinates (km) of the trajectory
     <tr><td> ye     <td> The electron fraction
+    <tr><td> fanue  <td> Electron anti-neutrino number fluxes (1/cm^2/s)
+    <tr><td> fnue   <td> Electron neutrino number fluxes (1/cm^2/s)
+    <tr><td> fanux  <td> Summed muon and tau anti-neutrino number fluxes (1/cm^2/s)
+    <tr><td> fnux   <td> Summed muon and tau neutrino number fluxes (1/cm^2/s)
     <tr><td> lanue  <td> Anti-electron neutrino luminosities (erg/s)
     <tr><td> lnue   <td> Electron neutrino luminosities (erg/s)
     <tr><td> tanue  <td> Electron anti-neutrino temperatures (MeV)
@@ -2159,6 +2163,14 @@ An example file looks like:
     <tr><td> enux   <td> Muon and tau neutrino energies (MeV)
     <tr><td> skip   <td> skip a column
     </table>
+
+    Instead of a luminosity, the neutrino source can be given as a number flux
+    together with the average neutrino energy, e.g.,
+    <b> "time temp dens rad ye fnue fanue enue eanue" </b>. Internally the
+    fluxes are converted back into luminosities,
+    \f$ L = F \cdot 4\pi r^2 \cdot \langle E \rangle \f$. Since the
+    luminosity is held constant when the trajectory is extrapolated, the flux
+    drops with \f$ 1/r^2 \f$ there.
 
     A unit can be appended to each column name with a colon. Besides the cgs
     units, time, density, and radius also accept the unit <b>msol</b> (or

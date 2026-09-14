@@ -239,6 +239,7 @@ TESTS += alpha_decay
 TESTS += analytic_mode
 TESTS += nse
 TESTS += read_neutrino
+TESTS += nu_flux
 TESTS += switch_evolution
 TESTS += expand
 TESTS += tabulated_rates
