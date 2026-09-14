@@ -562,7 +562,6 @@ subroutine jacobi_init (time, itemp, rho, rkm, Y, Y_p, dYdt, rhs, h, evolution_m
    real(r_kind)                             :: rat     !< Reaction rate
    real(r_kind)                             :: Ye      !< electron fraction
    type(reactionrate_type)                  :: rr_tmp  !< Reaction rate instance
-   character*1,dimension(6)                 :: descra  !< Descriptor for sparse matrix multiplication
    real(r_kind)                             :: infty   !< Infinity to check for errors
    integer                                  :: fl_c    !< fission loop count
    real(r_kind)                             :: l_1
@@ -573,8 +572,6 @@ subroutine jacobi_init (time, itemp, rho, rkm, Y, Y_p, dYdt, rhs, h, evolution_m
    ! Initialize variable for infinity checks
    infty = HUGE(infty)
 
-   ! Descriptor for sparse matrix multiplication
-   descra = (/"G"," "," ","F"," "," "/)
    ! The diagonal value
    d = 1.d0/h
 
@@ -854,9 +851,13 @@ subroutine jacobi_init (time, itemp, rho, rkm, Y, Y_p, dYdt, rhs, h, evolution_m
          end do
       end if
       rhs = dYdt + d*(Y_p - Y)
-      ! computes matrix-vector product for a sparse matrix in the CSC format:
-      call mkl_dcscmv('T',net_size,net_size,1.d0,descra,vals,rows,pt_b,  &
-           pt_e,Y,1.d0,rhs)
+      ! add the matrix-vector product of the Jacobian, which is stored in
+      ! the CSC format (see \ref pardiso_class), i.e., rhs = A^T * Y + rhs
+      do i=1,net_size
+         do j=pt_b(i),pt_e(i)-1
+            rhs(i) = rhs(i) + vals(j)*Y(rows(j))
+         end do
+      end do
    elseif(solver==1) then ! Gear's method
       rhs = -(Y - get_predictor_Y())*(l_1/h) + (dYdt - get_predictor_dYdt()/h)
    endif
