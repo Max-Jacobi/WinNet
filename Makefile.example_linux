@@ -228,6 +228,7 @@ TESTS += neutron-decay-implicit-euler
 TESTS += ni56-decay
 TESTS += read_seeds
 TESTS += read_trajectory
+TESTS += geom_units
 TESTS += gamma_eq
 TESTS += detailed_balance
 TESTS += beta_eq

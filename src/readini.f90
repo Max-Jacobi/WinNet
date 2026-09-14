@@ -574,7 +574,7 @@ end subroutine read_seed
 !!
 !! @author Moritz Reichert
 function time_unit_conversion(unit)
-  use parameter_class, only: trajectory_format
+  use parameter_class, only: trajectory_format, phys => unit
   implicit none
   character(len=*),intent(in)  :: unit                 !< Input unit
   real(r_kind)                 :: time_unit_conversion !< Conversion factor to obtain seconds
@@ -592,6 +592,9 @@ function time_unit_conversion(unit)
         time_unit_conversion = 60
      case('yrs')
         time_unit_conversion = 31536000
+     case('msol','msun')
+        ! Geometric units with G=c=1 and lengths/times measured in solar masses
+        time_unit_conversion = phys%grav*phys%msol/phys%clight**3
      case default
         call raise_exception('Problem when analyzing: "'//&
                              trim(adjustl(trajectory_format))//'". '//NEW_LINE('A')//'Time unit "'//&
@@ -656,7 +659,7 @@ end function temp_unit_conversion
 !!
 !! @author Moritz Reichert
 function dens_unit_conversion(unit)
-  use parameter_class, only: trajectory_format
+  use parameter_class, only: trajectory_format, phys => unit
   implicit none
   character(len=*),intent(in) :: unit                 !< Input unit
   real(r_kind)                :: dens_unit_conversion !< Conversion factor to obtain g/ccm
@@ -674,6 +677,9 @@ function dens_unit_conversion(unit)
         dens_unit_conversion = 1d3
      case('kg/m^3')
         dens_unit_conversion = 1d-3
+     case('msol','msun')
+        ! Geometric units, i.e., one solar mass per (G*msol/c^2)^3
+        dens_unit_conversion = phys%msol/(phys%grav*phys%msol/phys%clight**2)**3
      case default
         call raise_exception('Problem when analyzing: "'//&
                              trim(adjustl(trajectory_format))//'". '//NEW_LINE('A')//'Density unit "'//&
@@ -696,7 +702,7 @@ end function dens_unit_conversion
 !!
 !! @author Moritz Reichert
 function dist_unit_conversion(unit)
-  use parameter_class, only: trajectory_format
+  use parameter_class, only: trajectory_format, phys => unit
   implicit none
   character(len=*),intent(in) :: unit                 !< Input unit
   real(r_kind)                :: dist_unit_conversion !< Conversion factor to obtain km
@@ -712,6 +718,9 @@ function dist_unit_conversion(unit)
         dist_unit_conversion = 1e-3
      case('cm')
         dist_unit_conversion = 1e-5
+     case('msol','msun')
+        ! Geometric units, i.e., lengths in units of G*msol/c^2 (~1.477 km)
+        dist_unit_conversion = phys%grav*phys%msol/phys%clight**2*1d-5
      case default
         call raise_exception('Problem when analyzing: "'//&
                              trim(adjustl(trajectory_format))//'". '//NEW_LINE('A')//'Radius unit "'//&

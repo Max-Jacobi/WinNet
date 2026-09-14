@@ -2160,6 +2160,15 @@ An example file looks like:
     <tr><td> skip   <td> skip a column
     </table>
 
+    A unit can be appended to each column name with a colon. Besides the cgs
+    units, time, density, and radius also accept the unit <b>msol</b> (or
+    <b>msun</b>), i.e., geometric units with \f$ G=c=1 \f$ and masses
+    measured in solar masses, which are the code units of most NR codes:
+    <b> "time:msol temp:mev dens:msol rad:msol ye" </b>. The corresponding
+    conversion factors are \f$ G M_\odot / c^3 = 4.927\cdot 10^{-6}\f$ s,
+    \f$ G M_\odot / c^2 = 1.477 \f$ km, and
+    \f$ M_\odot / (G M_\odot/c^2)^3 = 6.173\cdot 10^{17}\f$ g/ccm.
+
     @par Example template line:
    `` trajectory_format = "time temp dens rad ye lnu lanu tnu tanu" ``
    @see parameter_class::trajectory_format, readini::custom_read
