@@ -13,6 +13,7 @@ program driver
   use nucstuff_class,      only: el_ab
   use file_handling_class, only: delete_io_file
   use gear_module,         only: init_gear_solver
+  use pardiso_class,       only: pardiso_finalize
   use parameter_class
   use expansion_module
   use mergesort_module
@@ -151,6 +152,7 @@ program driver
   call expansion_finalize()
   call analysis_finalize()
   call mergesort_finalize()
+  call pardiso_finalize()
 #ifdef USE_HDF5
    call hdf5_module_finalize()
 #endif

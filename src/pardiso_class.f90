@@ -34,13 +34,25 @@ module pardiso_class
   integer,dimension(:),allocatable     , public  :: dia  !< dia(j) gives the index into vals that contains the (j,j) diagonal element of the matrix
   integer,dimension(:,:),allocatable   , public  :: jind !< jind(i,j) contains the index of jacobian entry in vals
 
+  !> @name PARDISO state that is kept between the solves
+  !! @{
+  integer*8,private :: pt(64)                   !< PARDISO internal memory pointer
+  integer  ,private :: iparm(64)                !< PARDISO control parameters
+  integer  ,private :: mtype  = 11              !< Real and unsymmetric matrix
+  integer  ,private :: maxfct = 1               !< Number of factorizations to keep
+  integer  ,private :: mnum   = 1               !< Which factorization to use
+  integer  ,private :: nrhs   = 1               !< Number of right hand sides
+  integer  ,private :: msglvl = 0               !< No statistical information
+  logical  ,private :: analyzed = .false.       !< Has the analysis phase been done?
+  !! @}
+
   !
   ! Public and private fields and methods of the module.
   !
   public:: &
-       netsolve, sparse
-  ! private:: &
-  !      nothing here
+       netsolve, sparse, pardiso_finalize
+  private:: &
+       pardiso_analyze, pardiso_setup
 
 contains
 
@@ -244,18 +256,14 @@ end subroutine sparse
 !! format accordingly.
 !!
 subroutine netsolve(rhs, res)
-   use parameter_class, only: solver
+   use parameter_class, only: solver, reuse_pardiso_analysis
    implicit none
 
    real(r_kind),dimension(net_size),intent(inout)  :: rhs      !< right-hand sides of the system
    real(r_kind),dimension(net_size),intent(inout)  :: res      !< resulting abundances
 
-!!!      definitions for sparse matrix solver pardiso
-   integer*8                                       ::pt(64)
-!!!     all other variables
    integer                                         :: i, j
-   integer                                         :: maxfct, mnum, mtype, phase, nrhs, error, msglvl
-   integer                                         :: iparm(64)
+   integer                                         :: phase, error, solve_error
    integer                                         :: ia_par(net_size+1)
    integer, dimension(:), allocatable              :: ja_par
    real(r_kind), dimension(:), allocatable         :: a_par
@@ -263,66 +271,64 @@ subroutine netsolve(rhs, res)
    integer                                         :: idum(1)
    real(r_kind)                                    :: ddum(1)
    integer                                         :: cnt
-   integer                                         :: nthreads
-   character*3                                     :: omp_env
    integer                                         :: nz_cnt
-
-   data nrhs /1/, maxfct /1/, mnum /1/
 
    INFO_ENTRY("netsolve")
 
-   nz_cnt = count(vals.ne.0.d0)
-   allocate(ja_par(nz_cnt))
-   allocate(a_par(nz_cnt))
-   ! Check if entries are zero and adjust
-   ! sparse format
-   cnt = 0
-   ia_par = -1
-   do i=1,net_size
-      do j=pt_b(i),pt_e(i)-1
-         if(vals(j).eq.0.d0) cycle
-         cnt = cnt + 1
-         a_par(cnt) = vals(j)
-         ja_par(cnt) = rows(j)
-         if (ia_par(i).lt.0) ia_par(i) = cnt
-      end do
-   end do
-   ia_par(net_size+1) = cnt+1
-
-   el = rhs
-
-! setup pardiso control parameters and initialize the solvers
-! internal adress pointers. this is only necessary for the first
-! call of the pardiso solver.
-!
-   mtype     = 11      ! unsymmetric matrix
-   call pardisoinit(pt, mtype, iparm)
-! numbers of processors ( value of omp_num_threads )
-   call getenv('OMP_NUM_THREADS',omp_env)
-   ! Check if variable is set, set threads to 1 if not
-   if (len_trim(omp_env)==0)then
-      nthreads=1
-   else
-     read(omp_env,'(i3)')nthreads
-   endif
-
-   iparm(3)  =  nthreads
-!    iparm(4)  = 61 ???
-!    iparm(11) =  1 ???
-!    iparm(13) =  1 ???
-   msglvl    =  0       ! without statistical information
-   iparm(8)  = 10       ! max numbers of iterative refinement steps
-   iparm(10) = 13
-   phase     = 13  ! analysis, numerical factorization, solve, iterative refinement
-
+   el   = rhs
    idum = 0
-   call pardiso (pt, maxfct, mnum, mtype, phase, net_size, a_par, ia_par, ja_par, &
-        idum, nrhs, iparm, msglvl, rhs, el, error)
 
-! termination and release of memory
-   phase     = -1           ! release internal memory
-   call pardiso (pt, maxfct, mnum, mtype, phase, net_size, ddum, idum, idum,&
-        idum, nrhs, iparm, msglvl, ddum, ddum, error)
+   if (reuse_pardiso_analysis) then
+      ! The sparsity pattern created in \ref sparse does not change, so the
+      ! reordering and the symbolic factorization are done for the first solve
+      ! only and the arrays are handed to PARDISO without a copy.
+      if (.not. analyzed) call pardiso_analyze()
+
+      phase = 23  ! numerical factorization, solve, iterative refinement
+      call pardiso (pt, maxfct, mnum, mtype, phase, net_size, vals, pt_b, rows, &
+           idum, nrhs, iparm, msglvl, rhs, el, error)
+   else
+      ! Check if entries are zero and adjust the sparse format. The jacobian
+      ! can be much sparser than its structure, most notably for broad fission
+      ! fragment distributions, where only the largest fragments are calculated
+      ! (see fission_rate_module::fiss_neglect).
+      nz_cnt = count(vals.ne.0.d0)
+      allocate(ja_par(nz_cnt))
+      allocate(a_par(nz_cnt))
+      cnt = 0
+      ia_par = -1
+      do i=1,net_size
+         do j=pt_b(i),pt_e(i)-1
+            if(vals(j).eq.0.d0) cycle
+            cnt = cnt + 1
+            a_par(cnt) = vals(j)
+            ja_par(cnt) = rows(j)
+            if (ia_par(i).lt.0) ia_par(i) = cnt
+         end do
+      end do
+      ia_par(net_size+1) = cnt+1
+
+      call pardiso_setup()
+
+      phase = 13  ! analysis, numerical factorization, solve, iterative refinement
+      call pardiso (pt, maxfct, mnum, mtype, phase, net_size, a_par, ia_par, ja_par, &
+           idum, nrhs, iparm, msglvl, rhs, el, error)
+
+      ! termination and release of memory, this overwrites the error of the solve
+      solve_error = error
+      phase = -1
+      call pardiso (pt, maxfct, mnum, mtype, phase, net_size, ddum, idum, idum,&
+           idum, nrhs, iparm, msglvl, ddum, ddum, error)
+      error = solve_error
+
+      deallocate(a_par)
+      deallocate(ja_par)
+   end if
+
+   if (error .ne. 0) then
+      call raise_exception("PARDISO failed to solve the system (error "//&
+                           trim(adjustl(int_to_str(error)))//").","netsolve",350005)
+   end if
 
 ! check solution for NaNs
    do i=1, net_size
@@ -347,11 +353,107 @@ subroutine netsolve(rhs, res)
    endselect
 
 ! end call pardiso
-   deallocate(a_par)
-   deallocate(ja_par)
    INFO_EXIT("netsolve")
    return
 
 end subroutine netsolve
+
+
+!> Sets up PARDISO and runs the analysis phase
+!!
+!! The fill-reducing reordering and the symbolic factorization only depend on
+!! the sparsity pattern of the jacobian, which is created once in \ref sparse
+!! and does not change afterwards. They are therefore done once and reused by
+!! every following call of \ref netsolve.
+!!
+!! @note The arrays of \ref sparse are handed to PARDISO directly, i.e.,
+!! \ref vals, \ref pt_b, and \ref rows are the values, the row pointers, and
+!! the column indices of the matrix in CSR format.
+subroutine pardiso_analyze()
+   implicit none
+
+   integer          :: i, phase, error
+   integer          :: idum(1)
+   real(r_kind)     :: ddum(1)
+
+   INFO_ENTRY("pardiso_analyze")
+
+   ! The rows have to be contiguous and the diagonal has to be part of the
+   ! pattern in order to hand the arrays to PARDISO without copying them.
+   do i=1,net_size
+      if ((pt_e(i) .ne. pt_b(i+1)) .or. (rows(dia(i)) .ne. i)) then
+         call raise_exception("Sparsity pattern of the jacobian is not a valid "//&
+                              "CSR matrix (row "//trim(adjustl(int_to_str(i)))//").",&
+                              "pardiso_analyze",350006)
+      end if
+   end do
+
+   call pardiso_setup()
+
+   ! Scaling and weighted matching are switched on by default for unsymmetric
+   ! matrices and are computed in the analysis phase from the matrix values.
+   ! They can therefore not be reused for a different jacobian.
+   iparm(11) = 0        ! no scaling
+   iparm(13) = 0        ! no weighted matching
+
+   idum  = 0
+   phase = 11           ! reordering and symbolic factorization
+   call pardiso (pt, maxfct, mnum, mtype, phase, net_size, vals, pt_b, rows, &
+        idum, nrhs, iparm, msglvl, ddum, ddum, error)
+   if (error .ne. 0) then
+      call raise_exception("PARDISO analysis phase failed (error "//&
+                           trim(adjustl(int_to_str(error)))//").",&
+                           "pardiso_analyze",350005)
+   end if
+
+   analyzed = .true.
+
+   INFO_EXIT("pardiso_analyze")
+
+end subroutine pardiso_analyze
+
+
+!> Initializes PARDISO and sets the control parameters
+subroutine pardiso_setup()
+   implicit none
+
+   integer          :: nthreads
+   character*3      :: omp_env
+
+   call pardisoinit(pt, mtype, iparm)
+
+   ! numbers of processors ( value of omp_num_threads )
+   call getenv('OMP_NUM_THREADS',omp_env)
+   ! Check if variable is set, set threads to 1 if not
+   if (len_trim(omp_env)==0)then
+      nthreads=1
+   else
+     read(omp_env,'(i3)')nthreads
+   endif
+
+   iparm(3)  = nthreads
+   iparm(8)  = 10       ! max numbers of iterative refinement steps
+   iparm(10) = 13
+
+end subroutine pardiso_setup
+
+
+!> Releases the memory that PARDISO allocated internally
+subroutine pardiso_finalize()
+   implicit none
+
+   integer          :: phase, error
+   integer          :: idum(1)
+   real(r_kind)     :: ddum(1)
+
+   if (.not. analyzed) return
+
+   idum  = 0
+   phase = -1           ! release internal memory
+   call pardiso (pt, maxfct, mnum, mtype, phase, net_size, ddum, idum, idum,&
+        idum, nrhs, iparm, msglvl, ddum, ddum, error)
+   analyzed = .false.
+
+end subroutine pardiso_finalize
 
 end module pardiso_class

@@ -760,6 +760,13 @@ adapt_stepsize_maxcount =
 # = 1: Gear
 solver =
 
+# Reuse the analysis phase (reordering and symbolic factorization) of the
+# PARDISO solver instead of redoing it for every linear system. This is
+# faster for most setups, but considerably slower for broad fission fragment
+# distributions (fissflag >= 3), where dropping the numerically zero entries
+# of the jacobian is worth more.
+reuse_pardiso_analysis =
+
 
 ### Case solver = 0 ###
 

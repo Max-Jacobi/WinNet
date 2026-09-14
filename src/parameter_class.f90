@@ -100,6 +100,7 @@ module parameter_class
   logical                 :: use_detailed_balance           !< Calculate the inverse reactions via detailed balance rather than using them form file
   logical                 :: use_detailed_balance_q_reac    !< Use Q-value from reaclib for the calculation of detailed balance
   logical                 :: use_thermal_nu_loss            !< Whether to include thermal neutrino loss or not.
+  logical                 :: reuse_pardiso_analysis         !< Reuse the PARDISO analysis phase instead of redoing it for every solve
   integer                 :: nu_loss_every                  !< Output neutrino loss and gain.
   integer                 :: h_nu_loss_every                !< Output neutrino loss and gain in hdf5 format.
   character(max_fname_len):: detailed_balance_src_ignore    !< Source flag(s) to ignore within calculated detailed balance
@@ -440,6 +441,7 @@ subroutine set_param(param_name,param_value)
       ":use_neutrino_loss_file" // &
       ":use_rate_variation"//&
       ":use_thermal_nu_loss"//&
+      ":reuse_pardiso_analysis"//&
       ":use_prepared_network"
    character(*), parameter :: string_params =  &
       ":trajectory_file" // &
@@ -712,6 +714,8 @@ subroutine set_param(param_name,param_value)
      use_detailed_balance_q_reac= lparam_value
    elseif(param_name.eq."use_thermal_nu_loss") then
     use_thermal_nu_loss= lparam_value
+   elseif(param_name.eq."reuse_pardiso_analysis") then
+    reuse_pardiso_analysis= lparam_value
    elseif(param_name.eq."use_neutrino_loss_file") then
      use_neutrino_loss_file= lparam_value
    elseif(param_name.eq."gear_ignore_adapt_stepsize") then
@@ -1067,6 +1071,7 @@ subroutine set_default_param
    use_alpha_decay_file        = .false.
    use_rate_variation          = .false.
    use_thermal_nu_loss         = .True.
+   reuse_pardiso_analysis      = .False.
    use_timmes_mue              = .True.
    use_detailed_balance        = .false.
    use_detailed_balance_q_reac = .false.
@@ -1233,6 +1238,7 @@ subroutine output_param
            write(ofile,'(2A)') 'use_rate_variation          = ' , yesno(use_rate_variation)
            write(ofile,'(2A)') 'use_tabulated_rates         = ' , yesno(use_tabulated_rates)
            write(ofile,'(2A)') 'use_thermal_nu_loss         = ' , yesno(use_thermal_nu_loss)
+           write(ofile,'(2A)') 'reuse_pardiso_analysis      = ' , yesno(reuse_pardiso_analysis)
            write(ofile,'(2A)') 'use_timmes_mue              = ' , yesno(use_timmes_mue)
            write(ofile,'(3A)') 'weak_rates_file             = "', trim(weak_rates_file),'"'
            write(ofile,'(3A)') 'Ye_analytic                 = "', trim(Ye_analytic),'"'
@@ -1303,6 +1309,18 @@ subroutine check_param
        end if
    end if
 
+
+   ! Reusing the analysis phase of PARDISO requires a static sparsity pattern.
+   ! For broad fission fragment distributions the jacobian contains many entries
+   ! that are part of the structure, but numerically zero, because only the
+   ! largest fragments are calculated (see fission_rate_module::fiss_neglect).
+   ! Dropping them is worth much more than the reused analysis there.
+   if (reuse_pardiso_analysis .and. (fissflag .ge. 3)) then
+      write(*,*) 'Warning: "reuse_pardiso_analysis" is switched on together with '//&
+                 'fissflag = '//trim(adjustl(int_to_str(fissflag)))//'. The fission '//&
+                 'fragment distributions are broad, which makes this option '//&
+                 'considerably slower instead of faster. Consider switching it off.'
+   end if
 
    ! Check that there are no inconsistencies in the parameters of the prepared binary files
    ! and the parameter file

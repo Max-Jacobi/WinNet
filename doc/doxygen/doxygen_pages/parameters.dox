@@ -354,6 +354,42 @@
          ``` final_time= 1e15 ```
       @see parameter_class::final_time
 
+   \section reuse_pardiso_analysis      reuse_pardiso_analysis
+
+   Every linear system is solved by PARDISO in three steps, the analysis
+   (a fill-reducing reordering and the symbolic factorization), the numerical
+   factorization, and the solve. The analysis only depends on the sparsity
+   pattern of the jacobian, which is created once in \ref pardiso_class::sparse
+   and does not change during a run. With this parameter switched on it is
+   therefore done for the first linear system only and reused afterwards, which
+   removes a large part of the cost of every following solve.
+
+   The default is \p no, because the reuse is not always a gain. When the
+   analysis is redone for every solve, the entries of the jacobian that are
+   numerically zero are dropped beforehand, so PARDISO factorizes a sparser
+   matrix. This matters for broad fission fragment distributions, where only
+   the largest fragments of a rate are calculated whenever the fissioning
+   nucleus is absent (see fission_rate_module::fiss_neglect), leaving most of
+   the entries of that rate at zero.
+
+   Measured on a neutron star merger trajectory with 6757 nuclei, single
+   threaded, the linear solve takes 70.7 ms with the fragments of Panov et al.
+   (\ref fissflag = 1) and 42.5 ms with this parameter switched on, a factor
+   1.7 faster. With the fragments of Mumpower et al. (\ref fissflag = 3) the
+   same solve takes 106 ms and 953 ms, a factor 9 slower, because 92 percent of
+   the entries of that jacobian are exactly zero and dropping them shrinks the
+   matrix from 1.3 million to 107 thousand entries. A warning is printed for
+   the latter combination.
+
+   Note that scaling and weighted matching of PARDISO are switched off when
+   the analysis is reused, since both are computed in the analysis phase from
+   the matrix values and are therefore not valid for a different jacobian.
+
+   @par Example template line:
+    `` reuse_pardiso_analysis = yes ``
+   @see parameter_class::reuse_pardiso_analysis, \ref pardiso_class, \ref fissflag
+
+
    \section fissflag                   fissflag
 
    Parameter to change the fission fragment distribution. Possible values are:
