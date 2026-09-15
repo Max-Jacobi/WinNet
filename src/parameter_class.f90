@@ -179,6 +179,7 @@ module parameter_class
   character(max_fname_len):: nuchannel_file                 !< Contains neutrino channel information as in Sieverding et al. 2018
   character(max_fname_len):: nurates_file                   !< Neutrino reactions on heavy nuclei as in Sieverding et al. 2018
   character(max_fname_len):: snapshot_file                  !< File that contains days, where a snapshot should be made
+  character(max_fname_len):: snapshot_radius_file           !< File that contains radii in km, where a snapshot should be made
   character(max_fname_len):: bfission_file                  !< Fission table for beta-delayed fission
   character(max_fname_len):: rate_variation_file            !< File that contains variation factors for reaction rates
   character(max_fname_len):: nfission_file                  !< Fission table for neutron-induced fission
@@ -467,6 +468,7 @@ subroutine set_param(param_name,param_value)
       ":track_nuclei_file" // &
       ":nurates_file" // &
       ":snapshot_file" // &
+      ":snapshot_radius_file" // &
       ":beta_decay_file" // &
       ":neutrino_mode" // &
       ":T9_analytic" // &
@@ -747,6 +749,8 @@ subroutine set_param(param_name,param_value)
      seed_format= trim(str_value)
    elseif(param_name.eq."snapshot_file") then
      snapshot_file= trim(str_value)
+   elseif(param_name.eq."snapshot_radius_file") then
+     snapshot_radius_file= trim(str_value)
    elseif(param_name.eq."net_source") then
      net_source= trim(str_value)
    elseif(param_name.eq."isotopes_file") then
@@ -1038,7 +1042,8 @@ subroutine set_default_param
    sfission_file               = trim(adjustl(win_path))//"FISS_Mumpower"
    snapshot_every              = 0
    h_snapshot_every            = 0
-   snapshot_file               = trim(adjustl(win_path))//"snapshot_freq.dat"
+   snapshot_file               = ""
+   snapshot_radius_file        = ""
    solver                      = 0
    t_analytic                  = 0.e0
    T9_analytic                 = "10.e0"
@@ -1209,6 +1214,7 @@ subroutine output_param
            write(ofile,'(3A)') 'sfission_file               = "', trim(sfission_file),'"'
          write(ofile,'(A,I5)') 'snapshot_every              = ' , snapshot_every
            write(ofile,'(3A)') 'snapshot_file               = "', trim(snapshot_file),'"'
+           write(ofile,'(3A)') 'snapshot_radius_file        = "', trim(snapshot_radius_file),'"'
          write(ofile,'(A,I1)') 'solver                      = ' , solver
      write(ofile,'(A,es14.7)') 't_analytic                  ='  , t_analytic
            write(ofile,'(3A)') 'T9_analytic                 = "', trim(T9_analytic),'"'

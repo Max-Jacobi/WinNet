@@ -1868,12 +1868,25 @@ An example file looks like:
    3650
    36500 }
    creates a snapshot after one hour, one day, one year, \f$10\f$ years,
-   and \f$100\f$ years.
+   and \f$100\f$ years. Can be combined with \ref snapshot_radius_file.
 
    @par Example template line:
    `` snapshot_file= "@WINNET@/data/Example_data/Example_MRSN_nup_process_obergaulinger/custom_snapshots.dat" ``
    @see parameter_class::snapshot_file, analysis::printsnap, readini::read_custom_snapshots
 
+
+   \section snapshot_radius_file       snapshot_radius_file
+   Path to a file for providing radii in km for custom snapshots, one per line.
+   Each radius is converted to the time of its last outgoing crossing (radius
+   increasing) after the network start, also if that happens in the NSE phase.
+   Radii beyond the trajectory end use the constant expansion velocity.
+   Only possible for \ref trajectory_mode "from_file" and only used if
+   \ref custom_snapshots or \ref h_custom_snapshots is enabled. Can be
+   combined with \ref snapshot_file.
+
+   @par Example template line:
+   `` snapshot_radius_file= "radii.dat" ``
+   @see parameter_class::snapshot_radius_file, \ref snapshot_file, readini::snapshot_radius_to_time
 
    \section solver                     solver
    WinNet contains different solver. With the parameter \ref solver you specify

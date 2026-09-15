@@ -17,12 +17,15 @@ module readini
   use error_msg_class
   use parameter_class, only  : trajectory_format, trajectory_mode,track_nuclei_every,&
                                h_track_nuclei_every,&
-                               nuflag,custom_snapshots,h_custom_snapshots,neutrino_mode
+                               nuflag,custom_snapshots,h_custom_snapshots,neutrino_mode,&
+                               snapshot_file,snapshot_radius_file
   implicit none
 
+  real(r_kind),dimension(:),allocatable,private :: snapshot_radius !< Snapshot radii [km] until converted to times
+
   ! Only make necessary routines public
-  public  :: readini_init, readini_finalize, read_seed
-  private :: read_custom_snapshots, read_track_nuclei, time_unit_conversion, &
+  public  :: readini_init, readini_finalize, read_seed, snapshot_radius_to_time
+  private :: read_custom_snapshots, read_number_file, sort_snapshot_times, read_track_nuclei, time_unit_conversion, &
              temp_unit_conversion, dens_unit_conversion, dist_unit_conversion, &
              nutemp_unit_conversion, nuenergy_unit_conversion, &
              nulumin_unit_conversion, nuflux_unit_conversion, &
@@ -83,66 +86,84 @@ end subroutine readini_init
 !! 1  }
 !! This would output a snapshot at 10 s, 30 min, and 1 day.
 !!
+!! Additionally, \ref parameter_class::snapshot_radius_file can list radii
+!! in km, see \ref snapshot_radius_to_time. Both files can be combined.
+!!
 !! @see timestep_module::restrict_timestep, analysis::output_iteration
 !!
 !! @author Moritz Reichert
 !!
 subroutine read_custom_snapshots()
-  use parameter_class, only: snapshot_file
-  use analysis,        only: snapshot_time,snapshot_amount
+  use analysis, only: snapshot_time,snapshot_amount
   implicit none
-  integer                       :: c_snapshots !< File id
-  integer                       :: rstat       !< Reading status
-  integer                       :: file_length !< Amount of lines of the file
-  integer                       :: i           !< Loop variable
-  logical                       :: sorted      !< For bubblesort
-  real(r_kind)                  :: helper      !< Storage for sorting array
 
-  ! Open the file
-  c_snapshots= open_infile(snapshot_file)
+  if ((len_trim(snapshot_file) .eq. 0) .and. (len_trim(snapshot_radius_file) .eq. 0)) &
+     call raise_exception('Custom snapshots enabled, but neither "snapshot_file" nor '//&
+                          '"snapshot_radius_file" is given.',"read_custom_snapshots",390027)
 
-  ! Get the length of the file
-  file_length = 0
-  do
-     read(c_snapshots,*,iostat=rstat)
-     if (rstat .ne. 0)exit
-     file_length = file_length + 1
-  end do
+  ! Times in days
+  if (len_trim(snapshot_file) .gt. 0) then
+     call read_number_file(snapshot_file,snapshot_time)
+     snapshot_time = snapshot_time*24.*60.*60. ! Convert Days -> Seconds
+  else
+     allocate(snapshot_time(0))
+  end if
+  snapshot_amount = size(snapshot_time)
+  call sort_snapshot_times()
 
-  ! Raise error if file_length is 0
-  if (file_length .eq. 0) then
-     call raise_exception('No custom snapshots found in the file given with the parameter "snapshot_file".',&
-                          "read_custom_snapshots",390027)
+  ! Radii in km, converted to times later in snapshot_radius_to_time
+  if (len_trim(snapshot_radius_file) .gt. 0) then
+     call read_number_file(snapshot_radius_file,snapshot_radius)
+  else
+     allocate(snapshot_radius(0))
   end if
 
-  ! Allocate Array
-  allocate(snapshot_time(file_length),stat=rstat)
-  if (rstat /= 0) call raise_exception('Allocation of "snapshot_time" failed.',"read_custom_snapshots",&
-                                      390001)
-  ! Rewind the file to read it again
-  rewind(c_snapshots)
+end subroutine read_custom_snapshots
 
-  ! Read the file again
-  do i=1,file_length
-     read(c_snapshots,*,iostat=rstat) snapshot_time(i)
-     if (rstat .ne. 0) call raise_exception("Unable to read custom snapshots."//NEW_LINE("A")//&
-                                            'Check the input file given with the parameter "snapshot_file".',&
-                                            "read_custom_snapshots",&
-                                            390003)
-     snapshot_time(i) = snapshot_time(i)*24.*60.*60. ! Convert Days -> Seconds
+
+!>
+!! Read a file with one number per line into a freshly allocated array.
+subroutine read_number_file(fname,arr)
+  implicit none
+  character(len=*),intent(in)                        :: fname !< File name
+  real(r_kind),dimension(:),allocatable,intent(out)  :: arr   !< Numbers in the file
+  integer :: fid,rstat,n,i
+
+  fid = open_infile(fname)
+  n = 0
+  do
+     read(fid,*,iostat=rstat)
+     if (rstat .ne. 0) exit
+     n = n + 1
   end do
+  if (n .eq. 0) call raise_exception('No custom snapshots found in "'//trim(fname)//'".',&
+                                     "read_number_file",390027)
+  allocate(arr(n),stat=rstat)
+  if (rstat /= 0) call raise_exception('Allocation of snapshot array failed.',"read_number_file",390001)
+  rewind(fid)
+  do i=1,n
+     read(fid,*,iostat=rstat) arr(i)
+     if (rstat .ne. 0) call raise_exception('Unable to read custom snapshots from "'//trim(fname)//'".',&
+                                            "read_number_file",390003)
+  end do
+  call close_io_file(fid,fname)
+end subroutine read_number_file
 
-  ! Store also length of the array
-  snapshot_amount = file_length
-  ! Bubblesort to ensure array is sorted
-  ! It is also the fastest way for already sorted arrays
+
+!>
+!! Sort \ref analysis::snapshot_time ascending (bubblesort, cheap for short arrays).
+subroutine sort_snapshot_times()
+  use analysis, only: snapshot_time,snapshot_amount
+  implicit none
+  integer      :: i
+  logical      :: sorted
+  real(r_kind) :: helper
+
   sorted = .false.
   do while (.not. sorted)
      sorted = .true.
-     ! Sort the array. Use Bubblesort
-     do i=1,file_length-1
+     do i=1,snapshot_amount-1
         if (snapshot_time(i+1) .lt. snapshot_time(i)) then
-           ! Swap entries
            helper             = snapshot_time(i+1)
            snapshot_time(i+1) = snapshot_time(i)
            snapshot_time(i)   = helper
@@ -150,12 +171,70 @@ subroutine read_custom_snapshots()
         end if
      end do
   end do
+end subroutine sort_snapshot_times
 
-  ! Close the file again
-  call close_io_file(c_snapshots,snapshot_file)
-  return
 
-end subroutine read_custom_snapshots
+!>
+!! @brief Convert snapshot radii [km] to times [s] and append them to the snapshot times.
+!!
+!! Only used if \ref parameter_class::snapshot_radius_file is given.
+!! Each radius is converted to the time of its last outgoing crossing
+!! (radius increasing) after the network start time, so a snapshot is also
+!! taken if that crossing happens during the NSE phase. Crossings within the
+!! trajectory use the same interpolation as the hydro update, crossings after
+!! the trajectory end use the constant velocity of the expansion
+!! (\ref expansion_module). Radii that are never crossed outgoing raise an
+!! error. Has to be called after \ref expansion_module::expansion_init.
+!!
+!! @author M. Jacobi
+subroutine snapshot_radius_to_time(t_start)
+  use parameter_class,  only: trajectory_mode
+  use analysis,         only: snapshot_time,snapshot_amount
+  use hydro_trajectory, only: zsteps,ztime,zrad
+  use expansion_module, only: expand,vel,rad_0,t_0
+  implicit none
+  real(r_kind),intent(in) :: t_start   !< Time at which the network starts [s]
+  integer                 :: i,j,jlast,nr
+  real(r_kind)            :: r,t
+  real(r_kind),dimension(:),allocatable :: tmp
+
+  nr = size(snapshot_radius)
+  if (nr .eq. 0) return
+  if (trim(trajectory_mode) .ne. 'from_file') &
+     call raise_exception('"snapshot_radius_file" requires trajectory_mode "from_file".',&
+                          "snapshot_radius_to_time",390028)
+
+  do i=1,nr
+     r = snapshot_radius(i)
+     if (expand .and. (vel .gt. 0d0) .and. (r .gt. rad_0)) then
+        ! Constant velocity expansion after the trajectory end is the last crossing
+        snapshot_radius(i) = t_0 + (r-rad_0)/vel
+        cycle
+     end if
+     ! Last outgoing crossing (radius increasing) after t_start
+     jlast = 0
+     do j=1,zsteps-1
+        if (ztime(j+1) .le. t_start) cycle
+        if ((exp(zrad(j)) .lt. r) .and. (r .le. exp(zrad(j+1)))) jlast = j
+     end do
+     if (jlast .eq. 0) call raise_exception("Snapshot radius "//trim(adjustl(num_to_str(r)))//&
+                             " km is never crossed outgoing after the network start.",&
+                             "snapshot_radius_to_time",390029)
+     ! Same interpolation as update_hydro: linear in log(R) vs. time
+     j = jlast
+     t = ztime(j) + (ztime(j+1)-ztime(j))*(log(r)-zrad(j))/(zrad(j+1)-zrad(j))
+     snapshot_radius(i) = max(t,t_start)
+  end do
+
+  ! Append to the snapshot times and sort
+  allocate(tmp(snapshot_amount+nr))
+  tmp(1:snapshot_amount) = snapshot_time(1:snapshot_amount)
+  tmp(snapshot_amount+1:) = snapshot_radius
+  call move_alloc(tmp,snapshot_time)
+  snapshot_amount = snapshot_amount+nr
+  deallocate(snapshot_radius)
+  call sort_snapshot_times()
+end subroutine snapshot_radius_to_time
 
 
 

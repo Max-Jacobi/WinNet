@@ -735,6 +735,11 @@ h_finab =
 # This file is only used if custom_snapshots or h_custom_snapshots are enabled.
 snapshot_file =
 
+# Path to a file for providing radii in km for custom snapshots (last outgoing
+# crossing). Can be combined with snapshot_file. Requires trajectory_mode
+# = "from_file". Only used if custom_snapshots or h_custom_snapshots is enabled.
+snapshot_radius_file =
+
 # Path to a file containing the nuclei that have to get tracked.
 # This path is only used if track_nuclei_every or h_track_nuclei_every is
 # greater than 0.

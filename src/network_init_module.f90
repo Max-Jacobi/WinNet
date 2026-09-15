@@ -368,6 +368,9 @@ logical                               :: init,converged
   ! initialise expansion module (for opening debug files)
     call expansion_init()
 
+  ! convert snapshot radii to times (needs t_i and the expansion velocity)
+    if (custom_snapshots .or. h_custom_snapshots) call snapshot_radius_to_time(t_i)
+
   ! start timing
     call system_clock(cl_start,cl_rate,cl_cmax)
 
