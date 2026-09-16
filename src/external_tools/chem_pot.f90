@@ -66,6 +66,7 @@ subroutine chempot(temp,den,ye,etaele,etapos)
        xpsi0,xdpsi0,xpsi1,xdpsi1,h3,                   &
        w0t,w1t,w0mt,w1mt,w0d,w1d,w0md,w1md,            &
        detadd,detadt,detapdd,detapdt
+  logical, save :: low_density_warned = .false.
 
 !..physical constants and parameters
   real(r_kind) mecc,positron_start
@@ -185,16 +186,15 @@ subroutine chempot(temp,den,ye,etaele,etapos)
      ! return
   end if
   if (din  .lt. d(1)) then
-     call raise_exception("Density * Ye ("//num_to_str(din)//&
-          ") was off the grid (smaller than "//num_to_str(d(1))//") "//NEW_LINE("A")//&
-          "when trying to interpolate electron and positron chemical potentials."//NEW_LINE("A")//&
-          "Density: "//num_to_str(den)//" g/ccm, Ye: "//num_to_str(ye)//NEW_LINE("A")//&
-          "Check your conditions or consider to switch off theoretical weak rates (iwformat = 0).", &
-          "chempot",&
-          130006)
-     ! write(6,'(1x,5(a,1pe11.3))') 'ye*den=',din,' d(1)=',d(1)
-     ! write(6,*) 'ye*den too small, off grid, returning'
-     ! return
+     ! Below the table the electrons are fully non-degenerate and the chemical
+     ! potential is a negligible ingredient (e.g. of the heating term), so
+     ! evaluate at the table edge instead of aborting the run (was W130006).
+     if (.not. low_density_warned) then
+        print *,"chempot: Density * Ye ("//num_to_str(din)//") below the table minimum ("// &
+                num_to_str(d(1))//"), using the table edge from now on"
+        low_density_warned = .true.
+     end if
+     din = d(1)
   end if
 
 !..initialize
