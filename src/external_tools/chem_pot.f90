@@ -66,7 +66,7 @@ subroutine chempot(temp,den,ye,etaele,etapos)
        xpsi0,xdpsi0,xpsi1,xdpsi1,h3,                   &
        w0t,w1t,w0mt,w1mt,w0d,w1d,w0md,w1md,            &
        detadd,detadt,detapdd,detapdt
-  logical, save :: low_density_warned = .false.
+  logical :: low_density_warned = .false.  ! initialised locals are implicitly saved
 
 !..physical constants and parameters
   real(r_kind) mecc,positron_start
